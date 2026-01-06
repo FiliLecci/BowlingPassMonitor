@@ -9,12 +9,48 @@
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 
+enum DataType {NONE, INT, UINT8, UINT16, FLOAT, BOOL};
+
+struct MenuItem {
+    const char* label;          // Menu voice name
+    MenuItem* parent;           // Pointer to parent (above level menu)
+    MenuItem* firstChild;       // First item of next menu
+    MenuItem* nextSibling;      // Next menu voice on same level
+    
+    DataType valueType;         // Type of item value (NONE if there is no value)
+    void* value;                // Pointer to value
+    void (*action)();           // Action performed by this item
+};
+/* Menu structure visualization
+Root
+  ↑
+Free --> Single --> Range
+  x         ↑         ↑
+         Target     Left --> Right
+*/
+
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-static bool isTargetSelection = false;    // Allow to modify selected value (if possible)
 
-static uint8_t singleTarget = 0;          // Single target selected listel
-static uint8_t range[2] = {0,0};          // Range left and right selected listels
+// Not static because they are used in the LED management
+volatile uint8_t singleTarget = 0;          // Single target selected listel
+volatile uint8_t range[2] = {0,0};          // Range left and right selected listels
+
+static volatile bool isValueEditingEnabled = false;   // Allow to modify selected value (if possible)
+static volatile MenuItem* selectedItem = NULL;        // Current menu position
+ 
+// MENU ITEMS
+
+static MenuItem root = {"ROOT", NULL, NULL, NULL, NULL, NULL, selectSubMenuAction};
+
+static MenuItem freeMode         = {"Modalità libera", &root, NULL, NULL, NULL, NULL, NULL};
+static MenuItem singleTargetMode = {"Target", NULL, NULL, NULL, NULL, NULL, selectSubMenuAction};
+static MenuItem rangeMode        = {"Range", NULL, NULL, NULL, NULL, NULL, selectSubMenuAction};
+
+static MenuItem target = {"Target", &singleTargetMode, NULL, NULL, UINT8, &singleTarget, toggleValueEditingAction};}
+
+static MenuItem leftTarget = {"Target SX", &rangeMode, NULL, NULL, UINT8, &range[0], toggleValueEditingAction};
+static MenuItem rightTarget = {"Target DX", NULL, NULL, NULL, UINT8, &range[1], toggleValueEditingAction};
 
 void setupScreen(){
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
@@ -29,10 +65,43 @@ void setupScreen(){
   display.clearDisplay();
 }
 
-void menuBtnPress(){}
+void initMenu(){
+  // Main menu
+  root.firstChild = &freeMode;
+  
+  freeMode.nextSibling = &singleTargetMode;
 
-void selectBtnPress(){}
+  singleTargetMode.nextSibling = &rangeMode;
+  singleTargetMode.firstChild = &target;
+
+  rangeMode.firstChild = &leftTarget;
+
+  // No setup needed for single target menu since there are no sub-menus nor siblings
+
+  // Range menu
+  leftTarget.nextSibling = &rightTarget;
+
+  selectedItem = &root;
+}
+
+void selectBtnPress(){
+  // Perform current menu item action
+  selectedItem->action();
+}
 
 void increaseAction(){}
 
 void decreaseAction(){}
+
+void selectSubMenuAction(){
+  selectedItem = selectedItem->firstChild;
+}
+
+void prevMenuAction(){
+  selectedItem = selectedItem.parent;
+  isValueEditingEnabled = false;  // this action may be performed by something other than a menu item (back button) so it's better to also reset this
+}
+
+void toggleValueEditingAction(){
+  isValueEditingEnabled = !isValueEditingEnabled;
+}
