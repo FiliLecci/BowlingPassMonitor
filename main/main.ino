@@ -1,5 +1,5 @@
 #include "Adafruit_VL53L1X.h"
-#include "Adafruit_NeoPixel.h"
+#include <Adafruit_NeoPixel.h>
 
 #include "MenuManager.ino"
 
@@ -9,11 +9,19 @@
 #define LANE_WIDTH 1070   //mm
 #define GUTTER_WIDTH 250  //mm
 
+// SENSORS PARAMS
 #define IRQ_PIN_L 2
 #define XSHUT_PIN_L 4
 
 #define IRQ_PIN_R 16
 #define XSHUT_PIN_R 17
+
+// BUTTONS AND ENCODER PARAMS
+#define MENU_BTN_PIN 16 // TODO
+#define SELECT_BTN_PIN -1 // TODO
+
+#define ENCODER_A -1  // TODO
+#define ENCODER_B -1  //TODO
 
 Adafruit_VL53L1X sensor_left = Adafruit_VL53L1X(XSHUT_PIN_L, IRQ_PIN_L);
 Adafruit_VL53L1X sensor_right = Adafruit_VL53L1X(XSHUT_PIN_R, IRQ_PIN_R);
@@ -32,7 +40,8 @@ void setupSensors(){
   }
 
   // setup right sensor
-  if (! sensor_right.begin(0x30, &Wire)) {
+  Wire1.begin();
+  if (! sensor_right.begin(0x30, &Wire1)) {
     Serial.print(F("Error on init of right VL sensor: "));
     Serial.println(sensor_right.vl_status);
     while (1)
@@ -60,6 +69,21 @@ void setupLedStrip(){
   strip.setBrightness(50);
   strip.begin();
   strip.show();
+}
+
+void setupInputs(){
+  // TODO check if this buttons can be set to INPUT_PULLDOWN to simplify the circuit.
+  pinMode(MENU_BTN_PIN, INPUT);
+  attachInterrupt(digitalPinToInterrupt(MENU_BTN_PIN), menuBtnPress, RISING);
+
+  pinMode(SELECT_BTN_PIN, INPUT);
+  attachInterrupt(digitalPinToInterrupt(SELECT_BTN_PIN), selectBtnPress, RISING);
+
+  // TODO Check if the GPIOs are actually pulled up
+  pinMode(ENCODER_A, INPUT_PULLUP);
+  pinMode(ENCODER_B, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(ENCODER_A), read_encoder, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENCODER_B), read_encoder, CHANGE);
 }
 
 void startLeftSensor(){
@@ -90,6 +114,43 @@ void startRightSensor(){
   Serial.println(F("Right ranging started"));
 }
 
+// code from https://github.com/mo-thunderz/RotaryEncoder/blob/main/Arduino/ArduinoRotaryEncoder/ArduinoRotaryEncoder.ino
+void read_encoder() {
+  // Encoder interrupt routine for both pins. Updates counter
+  // if they are valid and have rotated a full indent
+ 
+  static uint8_t old_AB = 3;  // Lookup table index
+  static int8_t encval = 0;   // Encoder value  
+  static const int8_t enc_states[]  = {0,-1,1,0,1,0,0,-1,-1,0,0,1,0,1,-1,0}; // Lookup table
+
+  old_AB <<=2;  // Remember previous state
+
+  if (digitalRead(ENC_A)) old_AB |= 0x02; // Add current state of pin A
+  if (digitalRead(ENC_B)) old_AB |= 0x01; // Add current state of pin B
+  
+  encval += enc_states[( old_AB & 0x0f )];
+
+  // Update counter if encoder has rotated a full indent, that is at least 4 steps
+  if( encval > 3 ) {        // Four steps forward
+    int changevalue = 1;
+    if((micros() - _lastIncReadTime) < _pauseLength) {
+      changevalue = _fastIncrement * changevalue; 
+    }
+    _lastIncReadTime = micros();
+    // counter = counter + changevalue;              // Perform action
+    encval = 0;
+  }
+  else if( encval < -3 ) {        // Four steps backward
+    int changevalue = -1;
+    if((micros() - _lastDecReadTime) < _pauseLength) {
+      changevalue = _fastIncrement * changevalue; 
+    }
+    _lastDecReadTime = micros();
+    // counter = counter + changevalue;              // Perform action
+    encval = 0;
+  }
+} 
+
 void setup() {
   Serial.begin(115200);
   while (!Serial) delay(10);
@@ -106,100 +167,102 @@ void setup() {
   setupLedStrip();
 }
 
-int leftLastValidDistance = 0;
-int rightLastValidDistance = 0;
-int lastValidDistance = 0;
+int16_t leftLastValidDistance = 0;
+int16_t rightLastValidDistance = 0;
+int16_t lastValidDistance = 0;
 
 // Fetch the sensor measurement and update the leftLastvalidDistance variable.
-int getLeftSensorReading(){
-  float distance = 0;
+bool getLeftSensorReading(){
+  int16_t distance = 0;
 
-  if (sensor_left.dataReady()) {
-    // new measurement for the taking!
-    distance = sensor_left.distance();
-    if (distance == -1) {
-      // something went wrong!
-      Serial.print(F("Couldn't get left distance: "));
-      Serial.println(sensor_left.vl_status);
-      return -1;
-    }
-    // data is read out, time for another reading!
-    sensor_left.clearInterrupt();
+  if (!sensor_left.dataReady())
+    return false;
 
-    leftLastValidDistance = distance;
-
-    return 1;
+  // new measurement for the taking!
+  distance = sensor_left.distance();
+  if (distance == -1) {
+    // something went wrong!
+    Serial.print(F("Couldn't get left distance: "));
+    Serial.println(sensor_left.vl_status);
+    return false;
   }
-  return 0;
+  // data is read out, time for another reading!
+  sensor_left.clearInterrupt();
+
+  leftLastValidDistance = distance;
+
+  return true;
 }
 
 // Fetch the sensor measurement and update the rightLastvalidDistance variable.
-int getRightSensorReading(){
-  float distance = 0;
+bool getRightSensorReading(){
+  int16_t distance = 0;
 
-  if (sensor_right.dataReady()) {
-    // new measurement for the taking!
-    distance = sensor_right.distance();
-    if (distance == -1) {
-      // something went wrong!
-      Serial.print(F("Couldn't get right distance: "));
-      Serial.println(sensor_right.vl_status);
-      return -1;
-    }
-    // data is read out, time for another reading!
-    sensor_left.clearInterrupt();
+  if (sensor_right.dataReady())
+    return false;
 
-    rightLastValidDistance = distance;
-
-    return 1;
+  // new measurement for the taking!
+  distance = sensor_right.distance();
+  if (distance == -1) {
+    // something went wrong!
+    Serial.print(F("Couldn't get right distance: "));
+    Serial.println(sensor_right.vl_status);
+    return false;
   }
-  return 0;
+  // data is read out, time for another reading!
+  sensor_left.clearInterrupt();
+
+  rightLastValidDistance = distance;
+
+  return true;
 }
 
 // Given a distance from a lane side (doesn't matter which) in mm, returns the closest listel to that point.
 // This function doesn't account for gutter width
-int distanceToListel(float distance){
-  int numListels = 39;
-  int laneWidth = 1070;  //mm
+int16_t distanceToListel(float distance){
+  int16_t numListels = 39;
+  int16_t laneWidth = 1070;  //mm
   
   return round(distance/(laneWidth/numListels));
 }
 
 // Calculate the ball center position from the LEFT of the bowling lane.
-int calculateBallCenter(){
-  if(getLeftSensorReading() != 1)
+float calculateBallCenter(){
+  if(!getLeftSensorReading())
     return -1;
 
-  if(getRightSensorReading() != 1)
+  if(!getRightSensorReading())
     return -1;
 
   // estimated center position from the left side of the lane from sensors raw data
-  int laneLeftPos = leftLastValidDistance - GUTTER_WIDTH + (BALL_DIAMETER/2);
-  int laneRightPos = LANE_WIDTH - (rightLastValidDistance - GUTTER_WIDTH + (BALL_DIAMETER/2));
+  int16_t laneLeftPos = leftLastValidDistance - GUTTER_WIDTH + (BALL_DIAMETER/2);
+  int16_t laneRightPos = LANE_WIDTH - (rightLastValidDistance - GUTTER_WIDTH + (BALL_DIAMETER/2));
 
   return (laneLeftPos + laneRightPos) / 2;  // average of the two calculated centers
 }
 
-void loop() {
-  int16_t distance;
+void updateLEDStrip(){
+  // Free mode
 
-  lastValidDistance = (leftLastValidDistance + rightLastValidDistance)/2;
+  // Single target mode
+
+  // Range mode
+}
+
+void loop() {
+  int16_t ballCenter;
+
+  // if the center has not been calculated don't do anything 
+  if((ballCenter = calculateBallCenter()) == -1)
+    return;
+
+  if (ballCenter < 0 || ballCenter > LANE_WIDTH) // invalid center position
+    return;
+
+  lastValidDistance = ballCenter;
   
-  if(lastValidDistance > 1000){
-    strip.setPixelColor(0, 0, 0, 255);
-    strip.setPixelColor(1, 0, 0, 255);
-  }
-  else if(lastValidDistance < 1000 && lastValidDistance >500){
-    strip.setPixelColor(0, 0, 255, 0);
-    strip.setPixelColor(1, 0, 255, 0);  
-  }
-  else if(lastValidDistance < 500 && lastValidDistance > 200){
-    strip.setPixelColor(0, 0, 255, 0);
-    strip.setPixelColor(1, 255, 0, 0);  
-  }
-  else if(lastValidDistance < 200){
-    strip.setPixelColor(0, 255, 0, 0);
-    strip.setPixelColor(1, 255, 0, 0);  
-  }
+  // LED strip logic
+  updateLEDStrip();
+
   strip.show();
 }
