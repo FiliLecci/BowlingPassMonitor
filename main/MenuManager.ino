@@ -11,6 +11,7 @@
 
 enum DataType {NONE, INT, UINT8, UINT16, FLOAT, BOOL};
 
+// Refer to README on how this structure can be visualized
 struct MenuItem {
     const char* label;          // Menu voice name
     MenuItem* parent;           // Pointer to parent (above level menu)
@@ -19,19 +20,18 @@ struct MenuItem {
     MenuItem* prevSibling;      // Previous menu item
     
     DataType valueType;         // Type of item value (NONE if there is no value)
-    void* value;                // Pointer to value
+    volatile void* value;       // Pointer to value
     void (*action)();           // Action performed by this item
 };
-/* Menu structure visualization
-Root
-  ↑
-Free --> Single --> Range
-  x         ↑         ↑
-         Target     Left --> Right
-*/
+
+// FUNCTIONS PROTOTYPES FOR FOLLOWING MENU ITEMS ACTIONS
+void selectSubMenuAction();
+
+void toggleValueEditingAction();
+
+
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-
 
 // Not static because they are used in the LED management
 volatile uint8_t singleTarget = 0;          // Single target selected listel
@@ -42,16 +42,16 @@ static volatile MenuItem* selectedItem = NULL;        // Current menu position
  
 // MENU ITEMS
 
-static MenuItem root = {"ROOT", NULL, NULL, NULL, NULL, NULL, selectSubMenuAction};
+static MenuItem root              = {"ROOT", NULL, NULL, NULL, NULL, NONE, NULL, selectSubMenuAction};
 
-static MenuItem freeMode         = {"Modalità libera", &root, NULL, NULL, NULL, NULL, NULL};
-static MenuItem singleTargetMode = {"Target", &root, NULL, NULL, NULL, NULL, selectSubMenuAction};
-static MenuItem rangeMode        = {"Range", &root, NULL, NULL, NULL, NULL, selectSubMenuAction};
+static MenuItem freeMode          = {"Modalità libera", &root, NULL, NULL, NULL, NONE, NULL, NULL};
+static MenuItem singleTargetMode  = {"Target", &root, NULL, NULL, NULL, NONE, NULL, selectSubMenuAction};
+static MenuItem rangeMode         = {"Range", &root, NULL, NULL, NULL, NONE, NULL, selectSubMenuAction};
 
-static MenuItem target = {"Target", &singleTargetMode, NULL, NULL, UINT8, &singleTarget, toggleValueEditingAction};}
+static MenuItem target            = {"Target", &singleTargetMode, NULL, NULL, NULL, UINT8, &singleTarget, toggleValueEditingAction};
 
-static MenuItem leftTarget = {"Target SX", &rangeMode, NULL, NULL, UINT8, &range[0], toggleValueEditingAction};
-static MenuItem rightTarget = {"Target DX", &rangeMode, NULL, NULL, UINT8, &range[1], toggleValueEditingAction};
+static MenuItem leftTarget        = {"Target SX", &rangeMode, NULL, NULL, NULL, UINT8, &range[0], toggleValueEditingAction};
+static MenuItem rightTarget       = {"Target DX", &rangeMode, NULL, NULL, NULL, UINT8, &range[1], toggleValueEditingAction};
 
 void setupScreen(){
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
@@ -99,12 +99,12 @@ void increaseAction(){
     return;
   }
 
-  if(selectedItem.nextSibling == NULL){ // Check if next sibling is present
+  if(selectedItem->nextSibling == NULL){ // Check if next sibling is present
     return;
   }
 
   // move menu item pointer
-  selectedItem = selectedItem.nextSibling;
+  selectedItem = selectedItem->nextSibling;
 }
 
 void decreaseAction(){
@@ -112,12 +112,12 @@ void decreaseAction(){
     return;
   }
 
-  if(selectedItem.prevSibling == NULL){ // Check if previous sibling is present
+  if(selectedItem->prevSibling == NULL){ // Check if previous sibling is present
     return;
   }
 
   // move menu item pointer
-  selectedItem = selectedItem.prevSibling;
+  selectedItem = selectedItem->prevSibling;
 }
 
 void selectSubMenuAction(){
@@ -125,10 +125,12 @@ void selectSubMenuAction(){
 }
 
 void prevMenuAction(){
-  selectedItem = selectedItem.parent;
+  selectedItem = selectedItem->parent;
   isValueEditingEnabled = false;  // this action may be performed by something other than a menu item (back button) so it's better to also reset this
 }
 
 void toggleValueEditingAction(){
   isValueEditingEnabled = !isValueEditingEnabled;
 }
+
+void printItem(){}

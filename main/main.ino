@@ -1,7 +1,5 @@
-#include "Adafruit_VL53L1X.h"
+#include <Adafruit_VL53L1X.h>
 #include <Adafruit_NeoPixel.h>
-
-#include "MenuManager.ino"
 
 #define BALL_DIAMETER 217 //mm (average of allowed maximum and minimum ball diameter)
 
@@ -20,13 +18,19 @@
 #define MENU_BTN_PIN 16 // TODO
 #define SELECT_BTN_PIN -1 // TODO
 
-#define ENCODER_A -1  // TODO
-#define ENCODER_B -1  //TODO
+#define ENC_A -1  // TODO
+#define ENC_B -1  //TODO
 
 Adafruit_VL53L1X sensor_left = Adafruit_VL53L1X(XSHUT_PIN_L, IRQ_PIN_L);
 Adafruit_VL53L1X sensor_right = Adafruit_VL53L1X(XSHUT_PIN_R, IRQ_PIN_R);
 
 Adafruit_NeoPixel strip(2, 23, NEO_GRB + NEO_KHZ800);
+
+// Variables for encoder reading function
+unsigned long _lastIncReadTime = micros(); 
+unsigned long _lastDecReadTime = micros(); 
+int _pauseLength = 25000;
+int _fastIncrement = 10;
 
 // TODO keep trying to connect sensor if it fails
 void setupSensors(){
@@ -74,16 +78,16 @@ void setupLedStrip(){
 void setupInputs(){
   // TODO check if this buttons can be set to INPUT_PULLDOWN to simplify the circuit.
   pinMode(MENU_BTN_PIN, INPUT);
-  attachInterrupt(digitalPinToInterrupt(MENU_BTN_PIN), menuBtnPress, RISING);
+  attachInterrupt(digitalPinToInterrupt(MENU_BTN_PIN), prevMenuAction, RISING);
 
   pinMode(SELECT_BTN_PIN, INPUT);
   attachInterrupt(digitalPinToInterrupt(SELECT_BTN_PIN), selectBtnPress, RISING);
 
   // TODO Check if the GPIOs are actually pulled up
-  pinMode(ENCODER_A, INPUT_PULLUP);
-  pinMode(ENCODER_B, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(ENCODER_A), read_encoder, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(ENCODER_B), read_encoder, CHANGE);
+  pinMode(ENC_A, INPUT_PULLUP);
+  pinMode(ENC_B, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(ENC_A), read_encoder, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENC_B), read_encoder, CHANGE);
 }
 
 void startLeftSensor(){
