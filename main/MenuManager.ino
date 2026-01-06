@@ -45,13 +45,13 @@ static volatile MenuItem* selectedItem = NULL;        // Current menu position
 static MenuItem root = {"ROOT", NULL, NULL, NULL, NULL, NULL, selectSubMenuAction};
 
 static MenuItem freeMode         = {"Modalità libera", &root, NULL, NULL, NULL, NULL, NULL};
-static MenuItem singleTargetMode = {"Target", NULL, NULL, NULL, NULL, NULL, selectSubMenuAction};
-static MenuItem rangeMode        = {"Range", NULL, NULL, NULL, NULL, NULL, selectSubMenuAction};
+static MenuItem singleTargetMode = {"Target", &root, NULL, NULL, NULL, NULL, selectSubMenuAction};
+static MenuItem rangeMode        = {"Range", &root, NULL, NULL, NULL, NULL, selectSubMenuAction};
 
 static MenuItem target = {"Target", &singleTargetMode, NULL, NULL, UINT8, &singleTarget, toggleValueEditingAction};}
 
 static MenuItem leftTarget = {"Target SX", &rangeMode, NULL, NULL, UINT8, &range[0], toggleValueEditingAction};
-static MenuItem rightTarget = {"Target DX", NULL, NULL, NULL, UINT8, &range[1], toggleValueEditingAction};
+static MenuItem rightTarget = {"Target DX", &rangeMode, NULL, NULL, UINT8, &range[1], toggleValueEditingAction};
 
 void setupScreen(){
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
