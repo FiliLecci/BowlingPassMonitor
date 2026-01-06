@@ -94,9 +94,31 @@ void selectBtnPress(){
   selectedItem->action();
 }
 
-void increaseAction(){}
+void increaseAction(){
+  if(isValueEditingEnabled){ // modify item value
+    return;
+  }
 
-void decreaseAction(){}
+  if(selectedItem.nextSibling == NULL){ // Check if next sibling is present
+    return;
+  }
+
+  // move menu item pointer
+  selectedItem = selectedItem.nextSibling;
+}
+
+void decreaseAction(){
+  if(isValueEditingEnabled){ // modify item value
+    return;
+  }
+
+  if(selectedItem.prevSibling == NULL){ // Check if previous sibling is present
+    return;
+  }
+
+  // move menu item pointer
+  selectedItem = selectedItem.prevSibling;
+}
 
 void selectSubMenuAction(){
   selectedItem = selectedItem->firstChild;
