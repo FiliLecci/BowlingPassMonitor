@@ -15,7 +15,8 @@ struct MenuItem {
     const char* label;          // Menu voice name
     MenuItem* parent;           // Pointer to parent (above level menu)
     MenuItem* firstChild;       // First item of next menu
-    MenuItem* nextSibling;      // Next menu voice on same level
+    MenuItem* nextSibling;      // Next menu item
+    MenuItem* prevSibling;      // Previous menu item
     
     DataType valueType;         // Type of item value (NONE if there is no value)
     void* value;                // Pointer to value
@@ -72,15 +73,19 @@ void initMenu(){
   freeMode.nextSibling = &singleTargetMode;
 
   singleTargetMode.nextSibling = &rangeMode;
+  singleTargetMode.prevSibling = &freeMode;
   singleTargetMode.firstChild = &target;
 
   rangeMode.firstChild = &leftTarget;
+  rangeMode.prevSibling = &singleTargetMode;
 
   // No setup needed for single target menu since there are no sub-menus nor siblings
 
   // Range menu
   leftTarget.nextSibling = &rightTarget;
+  rightTarget.prevSibling = &leftTarget;
 
+  // Init starting position at root
   selectedItem = &root;
 }
 
