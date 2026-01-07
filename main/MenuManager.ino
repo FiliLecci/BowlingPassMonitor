@@ -9,9 +9,17 @@
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 
-enum DataType {NONE, INT, UINT8, UINT16, FLOAT, BOOL};
+enum DataType {INT, UINT8, UINT16, FLOAT, BOOL};
 
 // Refer to README on how this structure can be visualized
+struct ItemValue {
+    volatile void* valuePtr;
+    DataType type;
+    float min;
+    float max;
+    float step;
+};
+
 struct MenuItem {
     const char* label;          // Menu voice name
     MenuItem* parent;           // Pointer to parent (above level menu)
@@ -19,8 +27,8 @@ struct MenuItem {
     MenuItem* nextSibling;      // Next menu item
     MenuItem* prevSibling;      // Previous menu item
     
-    DataType valueType;         // Type of item value (NONE if there is no value)
-    volatile void* value;       // Pointer to value
+    ItemValue* valueConfig;      // Item value configuration
+
     void (*action)();           // Action performed by this item
 };
 
@@ -28,6 +36,9 @@ struct MenuItem {
 void selectSubMenuAction();
 
 void toggleValueEditingAction();
+
+
+String getItemString(MenuItem* item); // keep this here because Arduino is stupid and doesn't see the struct
 
 
 
@@ -39,19 +50,25 @@ volatile uint8_t range[2] = {0,0};          // Range left and right selected lis
 
 static volatile bool isValueEditingEnabled = false;   // Allow to modify selected value (if possible)
 static volatile MenuItem* selectedItem = NULL;        // Current menu position
- 
+
+// ITEMS VALUES
+
+static ItemValue singleTargetValue  = {&singleTarget, UINT8, 1, 39, 1};
+static ItemValue rangeLeftValue     = {&range[0], UINT8, 1, 39, 1};
+static ItemValue rangeRightValue     = {&range[1], UINT8, 1, 39, 1};
+
 // MENU ITEMS
 
-static MenuItem root              = {"ROOT", NULL, NULL, NULL, NULL, NONE, NULL, selectSubMenuAction};
+static MenuItem root              = {"ROOT", NULL, NULL, NULL, NULL, NULL, selectSubMenuAction};
 
-static MenuItem freeMode          = {"Modalità libera", &root, NULL, NULL, NULL, NONE, NULL, NULL};
-static MenuItem singleTargetMode  = {"Target", &root, NULL, NULL, NULL, NONE, NULL, selectSubMenuAction};
-static MenuItem rangeMode         = {"Range", &root, NULL, NULL, NULL, NONE, NULL, selectSubMenuAction};
+static MenuItem freeMode          = {"Modalità libera", &root, NULL, NULL, NULL, NULL, NULL};
+static MenuItem singleTargetMode  = {"Target", &root, NULL, NULL, NULL, NULL, selectSubMenuAction};
+static MenuItem rangeMode         = {"Range", &root, NULL, NULL, NULL, NULL, selectSubMenuAction};
 
-static MenuItem target            = {"Target", &singleTargetMode, NULL, NULL, NULL, UINT8, &singleTarget, toggleValueEditingAction};
+static MenuItem target            = {"Target", &singleTargetMode, NULL, NULL, NULL, &singleTargetValue, toggleValueEditingAction};
 
-static MenuItem leftTarget        = {"Target SX", &rangeMode, NULL, NULL, NULL, UINT8, &range[0], toggleValueEditingAction};
-static MenuItem rightTarget       = {"Target DX", &rangeMode, NULL, NULL, NULL, UINT8, &range[1], toggleValueEditingAction};
+static MenuItem leftTarget        = {"Target SX", &rangeMode, NULL, NULL, NULL, &rangeLeftValue, toggleValueEditingAction};
+static MenuItem rightTarget       = {"Target DX", &rangeMode, NULL, NULL, NULL, &rangeRightValue, toggleValueEditingAction};
 
 void setupScreen(){
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
@@ -90,34 +107,97 @@ void initMenu(){
 }
 
 void selectBtnPress(){
+  if(selectedItem->action == NULL)
+    return;
+
   // Perform current menu item action
   selectedItem->action();
 }
 
-void increaseAction(){
-  if(isValueEditingEnabled){ // modify item value
-    return;
-  }
+void updateSelectedItemValue(int8_t direction){
+  ItemValue* value = selectedItem->valueConfig;
 
-  if(selectedItem->nextSibling == NULL){ // Check if next sibling is present
-    return;
-  }
+  float stepAmount = value->step * direction;
 
-  // move menu item pointer
-  selectedItem = selectedItem->nextSibling;
+  switch (value->type) {
+    case UINT8:{
+      uint8_t* p = (uint8_t*)value->valuePtr;
+      int next = (int)*p + (int)stepAmount;
+
+      if (next > value->max)
+        *p = (uint8_t)value->min;
+      else if (next < value->min)
+        *p = (uint8_t)value->max;
+      else 
+        *p = (uint8_t)next;
+      break;
+    }
+    case UINT16:{
+      uint16_t* p = (uint16_t*)value->valuePtr;
+      int next = (int)*p + (int)stepAmount;
+
+      if (next > value->max)
+        *p = (uint16_t)value->min;
+      else if (next < value->min)
+        *p = (uint16_t)value->max;
+      else 
+        *p = (uint16_t)next;
+      break;
+    }
+    case INT:{
+      int* p = (int*)value->valuePtr;
+      int next = (int)*p + (int)stepAmount;
+
+      if (next > value->max)
+        *p = (int)value->min;
+      else if (next < value->min)
+        *p = (int)value->max;
+      else 
+        *p = (int)next;
+      break;
+    }
+    case FLOAT:{
+      float* p = (float*)value->valuePtr;
+      *p += stepAmount;
+
+      if (*p > value->max)
+        *p = value->min;
+      else if (*p < value->min)
+        *p = value->max;
+
+      break;
+    }
+    case BOOL:
+      *(bool*)value->valuePtr = !*(bool*)value->valuePtr;
+      break;
+
+    default:
+      break;
+  }
 }
 
-void decreaseAction(){
+void encoderAction(int8_t direction){
   if(isValueEditingEnabled){ // modify item value
+    updateSelectedItemValue(direction);
     return;
   }
 
-  if(selectedItem->prevSibling == NULL){ // Check if previous sibling is present
-    return;
+  if(direction == 1){  // clockwise
+    if(selectedItem->nextSibling == NULL){ // Check if next sibling is present
+      return;
+    }
+    
+    // move menu item pointer
+    selectedItem = selectedItem->nextSibling;
   }
+  else if(direction == -1){
+    if(selectedItem->prevSibling == NULL){ // Check if previous sibling is present
+      return;
+    }
 
-  // move menu item pointer
-  selectedItem = selectedItem->prevSibling;
+    // move menu item pointer
+    selectedItem = selectedItem->prevSibling;
+  }
 }
 
 void selectSubMenuAction(){
@@ -133,4 +213,42 @@ void toggleValueEditingAction(){
   isValueEditingEnabled = !isValueEditingEnabled;
 }
 
-void printItem(){}
+String getItemString(MenuItem* item) {
+    if (item == NULL) return "";
+
+    // Inizia con l'etichetta
+    String output = String(item->label);
+
+    // No value associated to the item: return label
+    if (item->valueConfig == NULL) {
+        return output;
+    }
+
+    output += ": ";
+
+    ItemValue* value = item->valueConfig;
+
+    switch (value->type) {
+        case UINT8:
+            output += String(*(uint8_t*)value->valuePtr);
+            break;
+        case UINT16:
+            output += String(*(uint16_t*)value->valuePtr);
+            break;
+        case INT:
+            output += String(*(int*)value->valuePtr);
+            break;
+        case FLOAT:
+            // Formatta il float con 2 cifre decimali
+            output += String(*(float*)value->valuePtr, 2);
+            break;
+        case BOOL:
+            output += (*(bool*)value->valuePtr) ? "TRUE" : "FALSE";
+            break;
+        default:
+            output += "TF is this?";
+            break;
+    }
+
+    return output;
+}
