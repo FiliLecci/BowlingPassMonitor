@@ -141,7 +141,7 @@ void read_encoder() {
       changevalue = _fastIncrement * changevalue; 
     }
     _lastIncReadTime = micros();
-    // counter = counter + changevalue;              // Perform action
+    encoderAction(1);              // Perform action
     encval = 0;
   }
   else if( encval < -3 ) {        // Four steps backward
@@ -150,25 +150,9 @@ void read_encoder() {
       changevalue = _fastIncrement * changevalue; 
     }
     _lastDecReadTime = micros();
-    // counter = counter + changevalue;              // Perform action
+    encoderAction(-1);              // Perform action
     encval = 0;
   }
-} 
-
-void setup() {
-  Serial.begin(115200);
-  while (!Serial) delay(10);
-
-  setupSensors();
-
-  startLeftSensor();
-  
-  Serial.print(F("Timing budgets (ms): L "));
-  Serial.print(sensor_left.getTimingBudget());
-  Serial.print(" R ");
-  Serial.println(sensor_right.getTimingBudget());
-
-  setupLedStrip();
 }
 
 int16_t leftLastValidDistance = 0;
@@ -251,6 +235,26 @@ void updateLEDStrip(){
   // Single target mode
 
   // Range mode
+}
+
+void setup() {
+  Serial.begin(115200);
+  while (!Serial) delay(10);
+
+  setupSensors();
+
+  startLeftSensor();
+  
+  Serial.print(F("Timing budgets (ms): L "));
+  Serial.print(sensor_left.getTimingBudget());
+  Serial.print(" R ");
+  Serial.println(sensor_right.getTimingBudget());
+
+  setupLedStrip();
+
+  setupScreen();
+
+  initMenu();
 }
 
 void loop() {
