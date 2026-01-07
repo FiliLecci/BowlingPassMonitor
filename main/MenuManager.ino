@@ -33,23 +33,25 @@ struct MenuItem {
 };
 
 // FUNCTIONS PROTOTYPES FOR FOLLOWING MENU ITEMS ACTIONS
-void selectSubMenuAction();
+static void selectSubMenuAction();
 
-void toggleValueEditingAction();
+static void toggleValueEditingAction();
 
 
-String getItemString(MenuItem* item); // keep this here because Arduino is stupid and doesn't see the struct
-
+static String getItemString(MenuItem* item); // Keep this here because Arduino is stupid and doesn't see the struct
+static bool isBefore(MenuItem* a, MenuItem* b);  // This also
 
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+const uint8_t maxLines = 3; // Maximum writable lines on the screen 
+MenuItem* volatile topDisplayedItem = NULL; // First item to display (the "MenuItem* volatile" declaration means that the volatile part is the pointer and not the content itself)
 
 // Not static because they are used in the LED management
 volatile uint8_t singleTarget = 0;          // Single target selected listel
 volatile uint8_t range[2] = {0,0};          // Range left and right selected listels
 
 static volatile bool isValueEditingEnabled = false;   // Allow to modify selected value (if possible)
-static volatile MenuItem* selectedItem = NULL;        // Current menu position
+static MenuItem* volatile selectedItem = NULL;        // Current menu position
 
 // ITEMS VALUES
 
@@ -102,8 +104,9 @@ void initMenu(){
   leftTarget.nextSibling = &rightTarget;
   rightTarget.prevSibling = &leftTarget;
 
-  // Init starting position at root
-  selectedItem = &root;
+  // Init starting position at first item below Root
+  selectedItem = root.firstChild == NULL ? &root : root.firstChild;
+  topDisplayedItem = selectedItem;
 }
 
 void selectBtnPress(){
@@ -114,10 +117,10 @@ void selectBtnPress(){
   selectedItem->action();
 }
 
-void updateSelectedItemValue(int8_t direction){
+static void updateSelectedItemValue(int8_t direction){
   ItemValue* value = selectedItem->valueConfig;
 
-  float stepAmount = value->step * direction;
+  float stepAmount = value->step * direction; // clockwise adds 1 step, counter-clockwise removes 1 step
 
   switch (value->type) {
     case UINT8:{
@@ -176,44 +179,88 @@ void updateSelectedItemValue(int8_t direction){
   }
 }
 
+static void updateScrolling() {
+  // create snapshots of volatile pointers to make sure they don't change from a row to another
+  MenuItem* selectedSnapshot = (MenuItem*)selectedItem;
+  MenuItem* topDisplayedSnapshot = (MenuItem*)topDisplayedItem;
+
+  // Verify if selected item is before top displayed item
+  if (isBefore(selectedSnapshot, topDisplayedSnapshot)) {
+      topDisplayedItem = selectedSnapshot;
+  }
+
+  // Verify if selected item is after last displayed item
+  MenuItem* temp = topDisplayedSnapshot;
+  for (int i = 0; i < maxLines - 1; i++) {
+      if (temp->nextSibling != NULL)
+        temp = temp->nextSibling;
+  }
+  
+  if (isBefore(temp, selectedSnapshot)) {
+      // Se il cursore è oltre l'ultima riga, sposta topDisplayedItem al fratello successivo
+      topDisplayedItem = topDisplayedSnapshot->nextSibling;
+  }
+}
+
+// Return true if item a is before item b
+static bool isBefore(MenuItem* a, MenuItem* b) {
+  if(a == b)
+    return false;
+
+  MenuItem* curr = b;
+  while (curr != NULL) {
+      if (curr == a)
+        return true;
+      curr = curr->prevSibling;
+  }
+  return false;
+}
+
 void encoderAction(int8_t direction){
+  // create snapshots of volatile pointers to make sure they don't change from a row to another
+  MenuItem* selectedSnapshot = (MenuItem*)selectedItem;
+
   if(isValueEditingEnabled){ // modify item value
     updateSelectedItemValue(direction);
     return;
   }
 
   if(direction == 1){  // clockwise
-    if(selectedItem->nextSibling == NULL){ // Check if next sibling is present
+    if(selectedSnapshot->nextSibling == NULL){ // Check if next sibling is present
       return;
     }
     
     // move menu item pointer
-    selectedItem = selectedItem->nextSibling;
+    selectedItem = selectedSnapshot->nextSibling;
   }
-  else if(direction == -1){
-    if(selectedItem->prevSibling == NULL){ // Check if previous sibling is present
+  else if(direction == -1){ // counter-clockwise
+    if(selectedSnapshot->prevSibling == NULL){ // Check if previous sibling is present
       return;
     }
 
     // move menu item pointer
-    selectedItem = selectedItem->prevSibling;
+    selectedItem = selectedSnapshot->prevSibling;
   }
+
+  updateScrolling();  // update topDisplayedItem if necessary
 }
 
-void selectSubMenuAction(){
+static void selectSubMenuAction(){
   selectedItem = selectedItem->firstChild;
+  topDisplayedItem = selectedItem;
 }
 
 void prevMenuAction(){
   selectedItem = selectedItem->parent;
+  topDisplayedItem = selectedItem;
   isValueEditingEnabled = false;  // this action may be performed by something other than a menu item (back button) so it's better to also reset this
 }
 
-void toggleValueEditingAction(){
+static void toggleValueEditingAction(){
   isValueEditingEnabled = !isValueEditingEnabled;
 }
 
-String getItemString(MenuItem* item) {
+static String getItemString(MenuItem* item) {
     if (item == NULL) return "";
 
     // Inizia con l'etichetta
@@ -251,4 +298,26 @@ String getItemString(MenuItem* item) {
     }
 
     return output;
+}
+
+// Print the menu on the screen buffer without showing it
+void updateDisplay(){
+  MenuItem *temp = topDisplayedItem;
+  
+  for(int i=0;i<maxLines;i++){
+    if(temp == NULL)
+      return;
+    
+    // Set item style if is the selected one
+    if(temp == selectedItem){
+      display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+    }
+
+    display.println(getItemString(temp));
+
+    // Reset text style
+    display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+
+    temp = temp->nextSibling;
+  }
 }

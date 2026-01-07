@@ -26,6 +26,9 @@ Adafruit_VL53L1X sensor_right = Adafruit_VL53L1X(XSHUT_PIN_R, IRQ_PIN_R);
 
 Adafruit_NeoPixel strip(2, 23, NEO_GRB + NEO_KHZ800);
 
+const uint16_t numListels = 39;
+const uint16_t laneWidth = 1070;  //mm
+
 // Variables for encoder reading function
 unsigned long _lastIncReadTime = micros(); 
 unsigned long _lastDecReadTime = micros(); 
@@ -77,10 +80,10 @@ void setupLedStrip(){
 
 void setupInputs(){
   // TODO check if this buttons can be set to INPUT_PULLDOWN to simplify the circuit.
-  pinMode(MENU_BTN_PIN, INPUT);
+  pinMode(MENU_BTN_PIN, INPUT_PULLDOWN);
   attachInterrupt(digitalPinToInterrupt(MENU_BTN_PIN), prevMenuAction, RISING);
 
-  pinMode(SELECT_BTN_PIN, INPUT);
+  pinMode(SELECT_BTN_PIN, INPUT_PULLDOWN);
   attachInterrupt(digitalPinToInterrupt(SELECT_BTN_PIN), selectBtnPress, RISING);
 
   // TODO Check if the GPIOs are actually pulled up
@@ -207,10 +210,7 @@ bool getRightSensorReading(){
 
 // Given a distance from a lane side (doesn't matter which) in mm, returns the closest listel to that point.
 // This function doesn't account for gutter width
-int16_t distanceToListel(float distance){
-  int16_t numListels = 39;
-  int16_t laneWidth = 1070;  //mm
-  
+int16_t distanceToListel(float distance){  
   return round(distance/(laneWidth/numListels));
 }
 
