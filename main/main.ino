@@ -1,3 +1,5 @@
+#include <SPI.h>
+#include <Wire.h>
 #include <Adafruit_VL53L1X.h>
 #include <Adafruit_NeoPixel.h>
 
@@ -7,22 +9,30 @@
 #define LANE_WIDTH 1070   //mm
 #define GUTTER_WIDTH 250  //mm
 
-// SENSORS PARAMS
-#define IRQ_PIN_L 2
-#define XSHUT_PIN_L 4
+// THIS WORKS ON A ESP32 BECAUSE IT HAS 2 I2C INTERFACES
+// First I2C interface
+#define SDA_1 21
+#define SCL_1 22
+// Second I2C interface
+#define SDA_2 16
+#define SCL_2 17
 
-#define IRQ_PIN_R 16
-#define XSHUT_PIN_R 17
+// SENSORS PARAMS
+// #define IRQ_PIN_L ... not used
+#define XSHUT_PIN_L 19
+
+// #define IRQ_PIN_R ... not used
+#define XSHUT_PIN_R 18
 
 // BUTTONS AND ENCODER PARAMS
-#define MENU_BTN_PIN 16 // TODO
+#define MENU_BTN_PIN -1 // TODO
 #define SELECT_BTN_PIN -1 // TODO
 
 #define ENC_A -1  // TODO
 #define ENC_B -1  //TODO
 
-Adafruit_VL53L1X sensor_left = Adafruit_VL53L1X(XSHUT_PIN_L, IRQ_PIN_L);
-Adafruit_VL53L1X sensor_right = Adafruit_VL53L1X(XSHUT_PIN_R, IRQ_PIN_R);
+Adafruit_VL53L1X sensor_left = Adafruit_VL53L1X(XSHUT_PIN_L);
+Adafruit_VL53L1X sensor_right = Adafruit_VL53L1X(XSHUT_PIN_R);
 
 Adafruit_NeoPixel strip(2, 23, NEO_GRB + NEO_KHZ800);
 
@@ -37,18 +47,37 @@ int _fastIncrement = 10;
 
 // TODO keep trying to connect sensor if it fails
 void setupSensors(){
+  pinMode(XSHUT_PIN_L, OUTPUT);
+  pinMode(XSHUT_PIN_R, OUTPUT);
+
+  // Reset MCU
+  digitalWrite(XSHUT_PIN_L, LOW);
+  digitalWrite(XSHUT_PIN_R, LOW);
+  delay(10);
+  
+  digitalWrite(XSHUT_PIN_L, HIGH);
+  digitalWrite(XSHUT_PIN_R, HIGH);
+  delay(10);
+
+  Wire.begin(SDA_1, SCL_1);
   // setup left sensor
-  Wire.begin();
-  if (! sensor_left.begin(0x29, &Wire)) {
+  Serial.println("Left sensor init...");
+
+  if (! sensor_left.begin(0x30, &Wire)) {
     Serial.print(F("Error on init of left VL sensor: "));
     Serial.println(sensor_left.vl_status);
     while (1)       
       delay(100);
   }
 
+  Serial.print(F("Sensor left ID: 0x"));
+  Serial.println(sensor_left.sensorID(), HEX);
+
   // setup right sensor
-  Wire1.begin();
-  if (! sensor_right.begin(0x30, &Wire1)) {
+  // Wire1.begin();
+  Serial.println("Right sensor init...");
+
+  if (! sensor_right.begin(0x31, &Wire)) {
     Serial.print(F("Error on init of right VL sensor: "));
     Serial.println(sensor_right.vl_status);
     while (1)
@@ -56,25 +85,22 @@ void setupSensors(){
   }
 
   // SENSORS SETUP COMPLETE
-
-  Serial.println(F("VL53L1X sensors OK!"));
-
-  Serial.print(F("Sensor left ID: 0x"));
-  Serial.println(sensor_left.sensorID(), HEX);
-
   Serial.print(F("Sensor right ID: 0x"));
   Serial.println(sensor_right.sensorID(), HEX);
 
-  /*
-  vl.VL53L1X_SetDistanceThreshold(100, 300, 3, 1);
-  vl.VL53L1X_SetInterruptPolarity(0);
-  */
+  Serial.println(F("VL53L1X sensors OK!"));
 }
 
 void setupLedStrip(){
+  Serial.println("Starting LED strip init...");
   //init led
-  strip.setBrightness(50);
   strip.begin();
+
+  strip.setBrightness(100);
+  strip.fill(strip.Color(0, 255, 0), 0, 39);
+  
+  Serial.println("LED strip init success.");
+
   strip.show();
 }
 
@@ -182,6 +208,7 @@ bool getLeftSensorReading(){
 
   leftLastValidDistance = distance;
 
+  Serial.printf("Left: %d\n", distance);
   return true;
 }
 
@@ -189,8 +216,10 @@ bool getLeftSensorReading(){
 bool getRightSensorReading(){
   int16_t distance = 0;
 
-  if (sensor_right.dataReady())
+  if (sensor_right.dataReady()){
+    Serial.println("Right data not ready.");
     return false;
+  }
 
   // new measurement for the taking!
   distance = sensor_right.distance();
@@ -205,6 +234,7 @@ bool getRightSensorReading(){
 
   rightLastValidDistance = distance;
 
+  Serial.printf("Right: %d\n", distance);
   return true;
 }
 
@@ -244,11 +274,7 @@ void setup() {
   setupSensors();
 
   startLeftSensor();
-  
-  Serial.print(F("Timing budgets (ms): L "));
-  Serial.print(sensor_left.getTimingBudget());
-  Serial.print(" R ");
-  Serial.println(sensor_right.getTimingBudget());
+  startRightSensor();
 
   setupLedStrip();
 
@@ -258,6 +284,11 @@ void setup() {
 }
 
 void loop() {
+  if(isMenuChanged()){
+    updateDisplay();
+    displayAndClear();
+  }
+
   int16_t ballCenter;
 
   // if the center has not been calculated don't do anything 
