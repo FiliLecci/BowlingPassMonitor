@@ -1,5 +1,3 @@
-#include <SPI.h>
-#include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
@@ -42,9 +40,11 @@ static String getItemString(MenuItem* item); // Keep this here because Arduino i
 static bool isBefore(MenuItem* a, MenuItem* b);  // This also
 
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire1, OLED_RESET);
 const uint8_t maxLines = 3; // Maximum writable lines on the screen 
 MenuItem* volatile topDisplayedItem = NULL; // First item to display (the "MenuItem* volatile" declaration means that the volatile part is the pointer and not the content itself)
+
+bool menuChanged = false; // A flag indicating if the menù has changed and thus requires an update
 
 // Not static because they are used in the LED management
 volatile uint8_t singleTarget = 0;          // Single target selected listel
@@ -73,10 +73,16 @@ static MenuItem leftTarget        = {"Target SX", &rangeMode, NULL, NULL, NULL, 
 static MenuItem rightTarget       = {"Target DX", &rangeMode, NULL, NULL, NULL, &rangeRightValue, toggleValueEditingAction};
 
 void setupScreen(){
+  Serial.println("Starting display...");
+
+  Wire1.begin(SDA_2, SCL_2);
+
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println(F("SSD1306 allocation failed"));
     for(;;) delay(100);
   }
+
+  Serial.println("Display setup success.");
 
   display.display();
   delay(2000);
@@ -107,6 +113,8 @@ void initMenu(){
   // Init starting position at first item below Root
   selectedItem = root.firstChild == NULL ? &root : root.firstChild;
   topDisplayedItem = selectedItem;
+
+  menuChanged = true;
 }
 
 void selectBtnPress(){
@@ -115,6 +123,7 @@ void selectBtnPress(){
 
   // Perform current menu item action
   selectedItem->action();
+  menuChanged = true;
 }
 
 static void updateSelectedItemValue(int8_t direction){
@@ -177,6 +186,8 @@ static void updateSelectedItemValue(int8_t direction){
     default:
       break;
   }
+
+  menuChanged = true;
 }
 
 static void updateScrolling() {
@@ -243,21 +254,25 @@ void encoderAction(int8_t direction){
   }
 
   updateScrolling();  // update topDisplayedItem if necessary
+  menuChanged = true;
 }
 
 static void selectSubMenuAction(){
   selectedItem = selectedItem->firstChild;
   topDisplayedItem = selectedItem;
+  menuChanged = true;
 }
 
 void prevMenuAction(){
   selectedItem = selectedItem->parent;
   topDisplayedItem = selectedItem;
   isValueEditingEnabled = false;  // this action may be performed by something other than a menu item (back button) so it's better to also reset this
+  menuChanged = true;
 }
 
 static void toggleValueEditingAction(){
   isValueEditingEnabled = !isValueEditingEnabled;
+  menuChanged = true;
 }
 
 static String getItemString(MenuItem* item) {
@@ -303,6 +318,8 @@ static String getItemString(MenuItem* item) {
 // Print the menu on the screen buffer without showing it
 void updateDisplay(){
   MenuItem *temp = topDisplayedItem;
+
+  display.setCursor(1,1);
   
   for(int i=0;i<maxLines;i++){
     if(temp == NULL)
@@ -320,4 +337,15 @@ void updateDisplay(){
 
     temp = temp->nextSibling;
   }
+
+  menuChanged = false;  // The menù changes has been staged in the screen buffer
+}
+
+void displayAndClear(){
+  display.display();
+  display.clearDisplay();
+}
+
+bool isMenuChanged(){
+  return menuChanged;
 }
