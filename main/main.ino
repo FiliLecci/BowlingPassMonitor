@@ -1,6 +1,6 @@
 #include <SPI.h>
 #include <Wire.h>
-#include <Adafruit_VL53L1X.h>
+#include <VL53L1X.h>
 #include <Adafruit_NeoPixel.h>
 
 #define BALL_DIAMETER 217 //mm (average of allowed maximum and minimum ball diameter)
@@ -31,8 +31,8 @@
 #define ENC_A -1  // TODO
 #define ENC_B -1  //TODO
 
-Adafruit_VL53L1X sensor_left = Adafruit_VL53L1X(XSHUT_PIN_L);
-Adafruit_VL53L1X sensor_right = Adafruit_VL53L1X(XSHUT_PIN_R);
+VL53L1X sensor_left;
+VL53L1X sensor_right;
 
 Adafruit_NeoPixel strip(2, 23, NEO_GRB + NEO_KHZ800);
 
@@ -78,43 +78,43 @@ void setupSensors(){
 
   // Wake up left sensor
   digitalWrite(XSHUT_PIN_L, HIGH);
-  delay(10);
+  delay(50);
 
   Wire.begin(SDA_1, SCL_1);
   // setup left sensor
   Serial.println("Left sensor init...");
 
-  if (! sensor_left.begin(0x29, &Wire)) {
-    Serial.print(F("Error on init of left VL sensor: "));
-    Serial.println(sensor_left.vl_status);
+  sensor_left.setBus(&Wire);
+  if (! sensor_left.init()) {
+    Serial.print(F("Error on init of left VL sensor."));
     while (1)       
       delay(100);
   }
-  sensor_left.VL53L1X_SetI2CAddress(0x30);
+  sensor_left.setAddress(0x30);
 
   Serial.print(F("Sensor left ID: 0x"));
-  Serial.println(sensor_left.sensorID(), HEX);
+  Serial.println(sensor_left.getAddress(), HEX);
 
   scanI2C();
 
   // setup right sensor
   // Wake up right sensor
   digitalWrite(XSHUT_PIN_R, HIGH);
-  delay(10);
+  delay(50);
 
   Serial.println("Right sensor init...");
 
-  if (! sensor_right.begin(0x29, &Wire)) {
-    Serial.print(F("Error on init of right VL sensor: "));
-    Serial.println(sensor_right.vl_status);
+  sensor_right.setBus(&Wire);
+  if (! sensor_right.init()) {
+    Serial.print(F("Error on init of right VL sensor."));
     while (1)
       delay(100);
   }
-  sensor_right.VL53L1X_SetI2CAddress(0x31);
+  sensor_right.setAddress(0x31);
 
   // SENSORS SETUP COMPLETE
   Serial.print(F("Sensor right ID: 0x"));
-  Serial.println(sensor_right.sensorID(), HEX);
+  Serial.println(sensor_right.getAddress(), HEX);
 
   scanI2C();
 
@@ -152,29 +152,27 @@ void setupInputs(){
 }
 
 void startLeftSensor(){
-    if (! sensor_left.startRanging()) {
-      Serial.print(F("Left couldn't start ranging: "));
-      Serial.println(sensor_left.vl_status);
-      while (1)
-        delay(10);
-  }
-
   // Valid timing budgets: 15, 20, 33, 50, 100, 200 and 500ms!
-  sensor_left.setTimingBudget(100);
+  if(!sensor_left.setMeasurementTimingBudget(50000)){ // this is in us
+    Serial.println("Invalid time budget for left sensor.");
+    while(1)
+      delay(100);
+  }
+  
+  sensor_left.startContinuous(100);
 
-  Serial.println(F("Left ranging started"));
+  Serial.println(F("Right ranging started"));
 }
 
 void startRightSensor(){
-    if (! sensor_right.startRanging()) {
-      Serial.print(F("Right couldn't start ranging: "));
-      Serial.println(sensor_right.vl_status);
-      while (1)
-        delay(10);
-  }
-
   // Valid timing budgets: 15, 20, 33, 50, 100, 200 and 500ms!
-  sensor_right.setTimingBudget(100);
+  if(!sensor_right.setMeasurementTimingBudget(50000)){ // this is in us
+    Serial.println("Invalid time budget for right sensor.");
+    while(1)
+      delay(100);
+  }
+  
+  sensor_right.startContinuous(100);
 
   Serial.println(F("Right ranging started"));
 }
@@ -228,17 +226,18 @@ bool getLeftSensorReading(){
     return false;
 
   // new measurement for the taking!
-  distance = sensor_left.distance();
+  distance = sensor_left.read(false); // This also updates a ranging_data struct with info; might be useful later
   if (distance == -1) {
     // something went wrong!
     Serial.print(F("Couldn't get left distance: "));
-    Serial.println(sensor_left.vl_status);
+    Serial.println(sensor_left.last_status);
     return false;
   }
-  // data is read out, time for another reading!
-  sensor_left.clearInterrupt();
 
-  leftLastValidDistance = distance;
+  if(!sensor_left.timeoutOccurred())
+    leftLastValidDistance = distance;
+  else
+    Serial.println("LEFT Timeout.");
 
   return true;
 }
@@ -247,23 +246,22 @@ bool getLeftSensorReading(){
 bool getRightSensorReading(){
   int16_t distance = 0;
 
-  if (sensor_right.dataReady()){
-    Serial.println("Right data not ready.");
+  if (!sensor_right.dataReady())
     return false;
-  }
 
   // new measurement for the taking!
-  distance = sensor_right.distance();
+  distance = sensor_right.read(false); // This also updates a ranging_data struct with info; might be useful later
   if (distance == -1) {
     // something went wrong!
     Serial.print(F("Couldn't get right distance: "));
-    Serial.println(sensor_right.vl_status);
+    Serial.println(sensor_right.last_status);
     return false;
   }
-  // data is read out, time for another reading!
-  sensor_left.clearInterrupt();
 
-  rightLastValidDistance = distance;
+  if(!sensor_right.timeoutOccurred())
+    rightLastValidDistance = distance;
+  else
+    Serial.println("RIGHT Timeout.");
 
   return true;
 }
