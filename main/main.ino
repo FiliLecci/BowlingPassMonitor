@@ -95,8 +95,6 @@ void setupSensors(){
   Serial.print(F("Sensor left ID: 0x"));
   Serial.println(sensor_left.getAddress(), HEX);
 
-  scanI2C();
-
   // setup right sensor
   // Wake up right sensor
   digitalWrite(XSHUT_PIN_R, HIGH);
@@ -115,8 +113,6 @@ void setupSensors(){
   // SENSORS SETUP COMPLETE
   Serial.print(F("Sensor right ID: 0x"));
   Serial.println(sensor_right.getAddress(), HEX);
-
-  scanI2C();
 
   Wire.setClock(400000);
 
@@ -227,7 +223,7 @@ bool getLeftSensorReading(){
 
   // new measurement for the taking!
   distance = sensor_left.read(false); // This also updates a ranging_data struct with info; might be useful later
-  if (distance == -1) {
+  if (distance <= -1) {
     // something went wrong!
     Serial.print(F("Couldn't get left distance: "));
     Serial.println(sensor_left.last_status);
@@ -251,7 +247,7 @@ bool getRightSensorReading(){
 
   // new measurement for the taking!
   distance = sensor_right.read(false); // This also updates a ranging_data struct with info; might be useful later
-  if (distance == -1) {
+  if (distance <= -1) {
     // something went wrong!
     Serial.print(F("Couldn't get right distance: "));
     Serial.println(sensor_right.last_status);
@@ -268,23 +264,34 @@ bool getRightSensorReading(){
 
 // Given a distance from a lane side (doesn't matter which) in mm, returns the closest listel to that point.
 // This function doesn't account for gutter width
-int16_t distanceToListel(float distance){  
+uint8_t distanceToListel(float distance){  
   return round(distance/(laneWidth/numListels));
 }
 
 // Calculate the ball center position from the LEFT of the bowling lane.
-float calculateBallCenter(){
+bool calculateBallCenter(){
   if(!getLeftSensorReading())
-    return -1;
+    return false;
 
   if(!getRightSensorReading())
-    return -1;
+    return false;
+
+  // Check if measurements are valid
+  if(leftLastValidDistance < GUTTER_WIDTH-(BALL_DIAMETER/2) || leftLastValidDistance > LANE_WIDTH+GUTTER_WIDTH){
+    return false;
+  }
+
+  if(rightLastValidDistance < GUTTER_WIDTH-(BALL_DIAMETER/2) || rightLastValidDistance > LANE_WIDTH+GUTTER_WIDTH){
+    return false;
+  }
 
   // estimated center position from the left side of the lane from sensors raw data
   int16_t laneLeftPos = leftLastValidDistance - GUTTER_WIDTH + (BALL_DIAMETER/2);
   int16_t laneRightPos = LANE_WIDTH - (rightLastValidDistance - GUTTER_WIDTH + (BALL_DIAMETER/2));
 
-  return (laneLeftPos + laneRightPos) / 2;  // average of the two calculated centers
+  lastValidDistance = (laneLeftPos + laneRightPos) / 2;  // average of the two calculated centers
+
+  return true;
 }
 
 void updateLEDStrip(){
@@ -313,29 +320,20 @@ void setup() {
 }
 
 void loop() {
-  if(isMenuChanged()){
-    updateDisplay();
-    displayAndClear();
-  }
+  calculateBallCenter();
 
-  Serial.printf("%d - %d | %d - %d\n", getLeftSensorReading(), leftLastValidDistance, getRightSensorReading(), rightLastValidDistance);
+  Serial.printf("%d | %d | %d\n", leftLastValidDistance, rightLastValidDistance, lastValidDistance);
 
-  delay(1000);
-  /*
-  int16_t ballCenter;
+  drawBars(leftLastValidDistance-GUTTER_WIDTH, rightLastValidDistance-GUTTER_WIDTH, lastValidDistance);
 
-  // if the center has not been calculated don't do anything 
-  if((ballCenter = calculateBallCenter()) == -1)
-    return;
-
-  if (ballCenter < 0 || ballCenter > LANE_WIDTH) // invalid center position
-    return;
-
-  lastValidDistance = ballCenter;
-  
   // LED strip logic
   updateLEDStrip();
 
   strip.show();
-  */
+
+  if(isMenuChanged()){
+    //updateDisplay();
+    displayAndClear();
+  }
+  delay(1000);
 }
