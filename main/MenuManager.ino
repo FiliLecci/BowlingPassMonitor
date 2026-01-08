@@ -316,7 +316,7 @@ static String getItemString(MenuItem* item) {
 }
 
 // Print the menu on the screen buffer without showing it
-void updateDisplay(){
+void updateMenu(){
   MenuItem *temp = topDisplayedItem;
 
   display.setCursor(1,1);
@@ -344,8 +344,23 @@ void updateDisplay(){
 void displayAndClear(){
   display.display();
   display.clearDisplay();
+  display.setCursor(1,1);
 }
 
 bool isMenuChanged(){
   return menuChanged;
+}
+
+// Custom displayed things
+
+// Gived the left and right distances and calculated center, draws two bars and a center point
+void drawBars(uint8_t leftD, uint8_t rightD, uint8_t centerP){
+  // Mappa la distanza (es. 0-1000mm) sulla larghezza dello schermo (0-128px)
+  int barL = map(leftD, 0, LANE_WIDTH, 0, SCREEN_WIDTH);
+  int barR = map(rightD, 0, LANE_WIDTH, 0, SCREEN_WIDTH);
+  int center = map(centerP, 0, LANE_WIDTH, 0, SCREEN_WIDTH);
+
+  display.fillRect(0, 10, barL, 12, SSD1306_WHITE);  // Barra Sinistra in alto
+  display.fillRect(SCREEN_WIDTH, 10, -barR, 12, SSD1306_WHITE); // Barra Destra in basso
+  display.drawCircle(centerP, 12, 2, SSD1306_WHITE);
 }
