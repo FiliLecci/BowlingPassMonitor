@@ -45,6 +45,18 @@ unsigned long _lastDecReadTime = micros();
 int _pauseLength = 25000;
 int _fastIncrement = 10;
 
+void scanI2C() {
+  byte error, address;
+  Serial.println("Scansione bus I2C...");
+  for(address = 1; address < 127; address++) {
+    Wire.beginTransmission(address);
+    if (Wire.endTransmission() == 0) {
+      Serial.print("Dispositivo trovato a 0x");
+      Serial.println(address, HEX);
+    }
+  }
+}
+
 // TODO keep trying to connect sensor if it fails
 void setupSensors(){
   pinMode(XSHUT_PIN_L, OUTPUT);
@@ -59,34 +71,54 @@ void setupSensors(){
   digitalWrite(XSHUT_PIN_R, HIGH);
   delay(10);
 
+  // Sleep both sensors
+  digitalWrite(XSHUT_PIN_L, LOW);
+  digitalWrite(XSHUT_PIN_R, LOW);
+  delay(10);
+
+  // Wake up left sensor
+  digitalWrite(XSHUT_PIN_L, HIGH);
+  delay(10);
+
   Wire.begin(SDA_1, SCL_1);
   // setup left sensor
   Serial.println("Left sensor init...");
 
-  if (! sensor_left.begin(0x30, &Wire)) {
+  if (! sensor_left.begin(0x29, &Wire)) {
     Serial.print(F("Error on init of left VL sensor: "));
     Serial.println(sensor_left.vl_status);
     while (1)       
       delay(100);
   }
+  sensor_left.VL53L1X_SetI2CAddress(0x30);
 
   Serial.print(F("Sensor left ID: 0x"));
   Serial.println(sensor_left.sensorID(), HEX);
 
+  scanI2C();
+
   // setup right sensor
-  // Wire1.begin();
+  // Wake up right sensor
+  digitalWrite(XSHUT_PIN_R, HIGH);
+  delay(10);
+
   Serial.println("Right sensor init...");
 
-  if (! sensor_right.begin(0x31, &Wire)) {
+  if (! sensor_right.begin(0x29, &Wire)) {
     Serial.print(F("Error on init of right VL sensor: "));
     Serial.println(sensor_right.vl_status);
     while (1)
       delay(100);
   }
+  sensor_right.VL53L1X_SetI2CAddress(0x31);
 
   // SENSORS SETUP COMPLETE
   Serial.print(F("Sensor right ID: 0x"));
   Serial.println(sensor_right.sensorID(), HEX);
+
+  scanI2C();
+
+  Wire.setClock(400000);
 
   Serial.println(F("VL53L1X sensors OK!"));
 }
@@ -208,7 +240,6 @@ bool getLeftSensorReading(){
 
   leftLastValidDistance = distance;
 
-  Serial.printf("Left: %d\n", distance);
   return true;
 }
 
@@ -234,7 +265,6 @@ bool getRightSensorReading(){
 
   rightLastValidDistance = distance;
 
-  Serial.printf("Right: %d\n", distance);
   return true;
 }
 
@@ -281,6 +311,7 @@ void setup() {
   setupScreen();
 
   initMenu();
+  scanI2C();
 }
 
 void loop() {
@@ -289,6 +320,10 @@ void loop() {
     displayAndClear();
   }
 
+  Serial.printf("%d - %d | %d - %d\n", getLeftSensorReading(), leftLastValidDistance, getRightSensorReading(), rightLastValidDistance);
+
+  delay(1000);
+  /*
   int16_t ballCenter;
 
   // if the center has not been calculated don't do anything 
@@ -304,4 +339,5 @@ void loop() {
   updateLEDStrip();
 
   strip.show();
+  */
 }
