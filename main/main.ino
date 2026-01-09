@@ -332,7 +332,12 @@ void loop() {
   if(isMenuChanged()){
     Serial.println("Updating menu...");
 
+    noInterrupts();
+
     updateMenu();
+
+    interrupts();
+    
     displayAndClear();
     
     Serial.println("Done.");

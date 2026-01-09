@@ -334,6 +334,9 @@ void updateMenu(){
     // Set item style if is the selected one
     if(temp == selectedItem){
       display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+      if(isValueEditingEnabled){
+        display.print("> ");
+      }
     }
 
     display.println(getItemString(temp));
