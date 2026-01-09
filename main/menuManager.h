@@ -1,6 +1,8 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
+#include "config.h"
+
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 32 // OLED display height, in pixels
 
@@ -41,10 +43,11 @@ static bool isBefore(MenuItem* a, MenuItem* b);  // This also
 
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire1, OLED_RESET);
-const uint8_t maxLines = 3; // Maximum writable lines on the screen 
+const uint8_t maxLines = 4; // Maximum writable lines on the screen 
 MenuItem* volatile topDisplayedItem = NULL; // First item to display (the "MenuItem* volatile" declaration means that the volatile part is the pointer and not the content itself)
 
 bool menuChanged = false; // A flag indicating if the menù has changed and thus requires an update
+int8_t updateSelectedItem = 0; // By how much the selected value should be updated at the next menù update 
 
 // Not static because they are used in the LED management
 volatile uint8_t singleTarget = 0;          // Single target selected listel
@@ -117,13 +120,12 @@ void initMenu(){
   menuChanged = true;
 }
 
-void selectBtnPress(){
+void IRAM_ATTR selectBtnPress(){
   if(selectedItem->action == NULL)
     return;
 
   // Perform current menu item action
   selectedItem->action();
-  menuChanged = true;
 }
 
 static void updateSelectedItemValue(int8_t direction){
@@ -227,12 +229,12 @@ static bool isBefore(MenuItem* a, MenuItem* b) {
   return false;
 }
 
-void encoderAction(int8_t direction){
+void IRAM_ATTR encoderAction(int8_t direction){
   // create snapshots of volatile pointers to make sure they don't change from a row to another
   MenuItem* selectedSnapshot = (MenuItem*)selectedItem;
 
   if(isValueEditingEnabled){ // modify item value
-    updateSelectedItemValue(direction);
+    updateSelectedItem = direction;
     return;
   }
 
@@ -253,7 +255,6 @@ void encoderAction(int8_t direction){
     selectedItem = selectedSnapshot->prevSibling;
   }
 
-  updateScrolling();  // update topDisplayedItem if necessary
   menuChanged = true;
 }
 
@@ -263,7 +264,7 @@ static void selectSubMenuAction(){
   menuChanged = true;
 }
 
-void prevMenuAction(){
+void IRAM_ATTR prevMenuAction(){
   selectedItem = selectedItem->parent;
   topDisplayedItem = selectedItem;
   isValueEditingEnabled = false;  // this action may be performed by something other than a menu item (back button) so it's better to also reset this
@@ -317,13 +318,18 @@ static String getItemString(MenuItem* item) {
 
 // Print the menu on the screen buffer without showing it
 void updateMenu(){
+  updateScrolling();  // update topDisplayedItem if necessary
+
+  if(updateSelectedItem != 0)
+    updateSelectedItemValue(updateSelectedItem);
+
   MenuItem *temp = topDisplayedItem;
 
   display.setCursor(1,1);
   
   for(int i=0;i<maxLines;i++){
     if(temp == NULL)
-      return;
+      break;  // make sure is a break or the menuChanged variable will remain true if there are less than maxLines items
     
     // Set item style if is the selected one
     if(temp == selectedItem){
@@ -339,6 +345,7 @@ void updateMenu(){
   }
 
   menuChanged = false;  // The menù changes has been staged in the screen buffer
+  updateSelectedItem = 0; // Reset item update
 }
 
 void displayAndClear(){
@@ -354,13 +361,13 @@ bool isMenuChanged(){
 // Custom displayed things
 
 // Gived the left and right distances and calculated center, draws two bars and a center point
-void drawBars(uint8_t leftD, uint8_t rightD, uint8_t centerP){
+void drawBars(uint16_t leftD, uint16_t rightD, uint16_t centerP){
   // Mappa la distanza (es. 0-1000mm) sulla larghezza dello schermo (0-128px)
-  int barL = map(leftD, 0, LANE_WIDTH, 0, SCREEN_WIDTH);
-  int barR = map(rightD, 0, LANE_WIDTH, 0, SCREEN_WIDTH);
-  int center = map(centerP, 0, LANE_WIDTH, 0, SCREEN_WIDTH);
+  uint8_t barL = map(leftD, 0, LANE_WIDTH, 0, SCREEN_WIDTH);
+  uint8_t barR = map(rightD, 0, LANE_WIDTH, 0, SCREEN_WIDTH);
+  uint8_t center = map(centerP, 0, LANE_WIDTH, 0, SCREEN_WIDTH);
 
-  display.fillRect(0, 10, barL, 12, SSD1306_WHITE);  // Barra Sinistra in alto
-  display.fillRect(SCREEN_WIDTH, 10, -barR, 12, SSD1306_WHITE); // Barra Destra in basso
-  display.drawCircle(centerP, 12, 2, SSD1306_WHITE);
+  display.fillRect(0, 10, barL, 6, SSD1306_WHITE);
+  display.fillRect(SCREEN_WIDTH-barR, 10, barR, 6, SSD1306_WHITE);
+  display.drawCircle(center, 13, 2, SSD1306_WHITE);
 }

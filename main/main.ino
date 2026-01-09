@@ -3,38 +3,14 @@
 #include <VL53L1X.h>
 #include <Adafruit_NeoPixel.h>
 
-#define BALL_DIAMETER 217 //mm (average of allowed maximum and minimum ball diameter)
-
-// TODO this parameters should be red dynamically in some way (probably configurable from the menu)
-#define LANE_WIDTH 1070   //mm
-#define GUTTER_WIDTH 250  //mm
-
-// THIS WORKS ON A ESP32 BECAUSE IT HAS 2 I2C INTERFACES
-// First I2C interface
-#define SDA_1 21
-#define SCL_1 22
-// Second I2C interface
-#define SDA_2 16
-#define SCL_2 17
-
-// SENSORS PARAMS
-// #define IRQ_PIN_L ... not used
-#define XSHUT_PIN_L 19
-
-// #define IRQ_PIN_R ... not used
-#define XSHUT_PIN_R 18
-
-// BUTTONS AND ENCODER PARAMS
-#define MENU_BTN_PIN -1 // TODO
-#define SELECT_BTN_PIN -1 // TODO
-
-#define ENC_A -1  // TODO
-#define ENC_B -1  //TODO
+#include "menuManager.h"
+#include "config.h"
 
 VL53L1X sensor_left;
 VL53L1X sensor_right;
 
-Adafruit_NeoPixel strip(2, 23, NEO_GRB + NEO_KHZ800);
+
+Adafruit_NeoPixel strip(2, STRIP_PIN, NEO_GRB + NEO_KHZ800);
 
 const uint16_t numListels = 39;
 const uint16_t laneWidth = 1070;  //mm
@@ -45,7 +21,9 @@ unsigned long _lastDecReadTime = micros();
 int _pauseLength = 25000;
 int _fastIncrement = 10;
 
-void scanI2C() {
+volatile int test = 0;
+
+void scanI2C1() {
   byte error, address;
   Serial.println("Scansione bus I2C...");
   for(address = 1; address < 127; address++) {
@@ -57,7 +35,18 @@ void scanI2C() {
   }
 }
 
-// TODO keep trying to connect sensor if it fails
+void scanI2C2() {
+  byte error, address;
+  Serial.println("Scansione bus I2C...");
+  for(address = 1; address < 127; address++) {
+    Wire1.beginTransmission(address);
+    if (Wire1.endTransmission() == 0) {
+      Serial.print("Dispositivo trovato a 0x");
+      Serial.println(address, HEX);
+    }
+  }
+}
+
 void setupSensors(){
   pinMode(XSHUT_PIN_L, OUTPUT);
   pinMode(XSHUT_PIN_R, OUTPUT);
@@ -121,60 +110,20 @@ void setupSensors(){
 
 void setupLedStrip(){
   Serial.println("Starting LED strip init...");
+
   //init led
   strip.begin();
 
   strip.setBrightness(100);
-  strip.fill(strip.Color(0, 255, 0), 0, 39);
+  strip.fill(strip.Color(0, 255, 0), 0, 2);
   
   Serial.println("LED strip init success.");
 
   strip.show();
 }
 
-void setupInputs(){
-  // TODO check if this buttons can be set to INPUT_PULLDOWN to simplify the circuit.
-  pinMode(MENU_BTN_PIN, INPUT_PULLDOWN);
-  attachInterrupt(digitalPinToInterrupt(MENU_BTN_PIN), prevMenuAction, RISING);
-
-  pinMode(SELECT_BTN_PIN, INPUT_PULLDOWN);
-  attachInterrupt(digitalPinToInterrupt(SELECT_BTN_PIN), selectBtnPress, RISING);
-
-  // TODO Check if the GPIOs are actually pulled up
-  pinMode(ENC_A, INPUT_PULLUP);
-  pinMode(ENC_B, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(ENC_A), read_encoder, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(ENC_B), read_encoder, CHANGE);
-}
-
-void startLeftSensor(){
-  // Valid timing budgets: 15, 20, 33, 50, 100, 200 and 500ms!
-  if(!sensor_left.setMeasurementTimingBudget(50000)){ // this is in us
-    Serial.println("Invalid time budget for left sensor.");
-    while(1)
-      delay(100);
-  }
-  
-  sensor_left.startContinuous(100);
-
-  Serial.println(F("Right ranging started"));
-}
-
-void startRightSensor(){
-  // Valid timing budgets: 15, 20, 33, 50, 100, 200 and 500ms!
-  if(!sensor_right.setMeasurementTimingBudget(50000)){ // this is in us
-    Serial.println("Invalid time budget for right sensor.");
-    while(1)
-      delay(100);
-  }
-  
-  sensor_right.startContinuous(100);
-
-  Serial.println(F("Right ranging started"));
-}
-
 // code from https://github.com/mo-thunderz/RotaryEncoder/blob/main/Arduino/ArduinoRotaryEncoder/ArduinoRotaryEncoder.ino
-void read_encoder() {
+void IRAM_ATTR read_encoder() {
   // Encoder interrupt routine for both pins. Updates counter
   // if they are valid and have rotated a full indent
  
@@ -208,6 +157,46 @@ void read_encoder() {
     encoderAction(-1);              // Perform action
     encval = 0;
   }
+}
+
+void setupInputs(){
+  pinMode(MENU_BTN_PIN, INPUT_PULLUP);
+  attachInterrupt(MENU_BTN_PIN, prevMenuAction, RISING);
+
+  pinMode(SELECT_BTN_PIN, INPUT_PULLUP);
+  attachInterrupt(SELECT_BTN_PIN, selectBtnPress, RISING);
+
+  pinMode(ENC_A, INPUT_PULLUP);
+  pinMode(ENC_B, INPUT_PULLUP);
+
+  attachInterrupt(ENC_A, read_encoder, CHANGE);
+  attachInterrupt(ENC_B, read_encoder, CHANGE);
+}
+
+void startLeftSensor(){
+  // Valid timing budgets: 15, 20, 33, 50, 100, 200 and 500ms!
+  if(!sensor_left.setMeasurementTimingBudget(50000)){ // this is in us
+    Serial.println("Invalid time budget for left sensor.");
+    while(1)
+      delay(100);
+  }
+  
+  sensor_left.startContinuous(100);
+
+  Serial.println(F("Left ranging started"));
+}
+
+void startRightSensor(){
+  // Valid timing budgets: 15, 20, 33, 50, 100, 200 and 500ms!
+  if(!sensor_right.setMeasurementTimingBudget(50000)){ // this is in us
+    Serial.println("Invalid time budget for right sensor.");
+    while(1)
+      delay(100);
+  }
+  
+  sensor_right.startContinuous(100);
+
+  Serial.println(F("Right ranging started"));
 }
 
 int16_t leftLastValidDistance = 0;
@@ -296,13 +285,18 @@ bool calculateBallCenter(){
 
 void updateLEDStrip(){
   // Free mode
+  uint8_t colorR = map(leftLastValidDistance, 0, LANE_WIDTH, 0, 255);
+  uint8_t colorG = map(leftLastValidDistance, 0, LANE_WIDTH, 255, 0);
 
+  strip.fill(strip.Color(colorR, colorG, 0), 0, 2);
   // Single target mode
 
   // Range mode
 }
 
 void setup() {
+  pinMode(2, OUTPUT);
+
   Serial.begin(115200);
   while (!Serial) delay(10);
 
@@ -311,29 +305,42 @@ void setup() {
   startLeftSensor();
   startRightSensor();
 
+  setupInputs();
+
   setupLedStrip();
 
   setupScreen();
 
   initMenu();
-  scanI2C();
+
+  scanI2C1();
+  scanI2C2();
 }
 
 void loop() {
   calculateBallCenter();
 
-  Serial.printf("%d | %d | %d\n", leftLastValidDistance, rightLastValidDistance, lastValidDistance);
+  // Serial.printf("%d | %d | %d\n", leftLastValidDistance, rightLastValidDistance, lastValidDistance);
 
-  drawBars(leftLastValidDistance-GUTTER_WIDTH, rightLastValidDistance-GUTTER_WIDTH, lastValidDistance);
+  //drawBars(leftLastValidDistance-GUTTER_WIDTH, rightLastValidDistance-GUTTER_WIDTH, lastValidDistance);
+  // displayAndClear();
 
   // LED strip logic
-  updateLEDStrip();
-
-  strip.show();
+  // updateLEDStrip();
+  // strip.show();
 
   if(isMenuChanged()){
-    //updateDisplay();
+    Serial.println("Updating menu...");
+
+    updateMenu();
     displayAndClear();
+    
+    Serial.println("Done.");
+
+    digitalWrite(2, HIGH);
+    delay(100);
+    digitalWrite(2, LOW);
   }
-  delay(1000);
+
+  delay(50);
 }
