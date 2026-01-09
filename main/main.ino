@@ -147,7 +147,7 @@ void IRAM_ATTR read_encoder() {
       changevalue = _fastIncrement * changevalue;
     }
     _lastIncReadTime = micros();
-    encoderAction(1);  // Perform action
+    encoderAction(-1);  // Perform action
     encval = 0;
   } else if (encval < -3) {  // Four steps backward
     int changevalue = -1;
@@ -155,7 +155,7 @@ void IRAM_ATTR read_encoder() {
       changevalue = _fastIncrement * changevalue;
     }
     _lastDecReadTime = micros();
-    encoderAction(-1);  // Perform action
+    encoderAction(1);  // Perform action
     encval = 0;
   }
 }
