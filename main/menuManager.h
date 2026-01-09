@@ -32,6 +32,9 @@ struct MenuItem {
     void (*action)();           // Action performed by this item
 };
 
+// Mutex for atomic operations
+extern portMUX_TYPE myMux;
+
 // FUNCTIONS PROTOTYPES FOR FOLLOWING MENU ITEMS ACTIONS
 static void selectSubMenuAction();
 
@@ -47,7 +50,7 @@ const uint8_t maxLines = 4; // Maximum writable lines on the screen
 MenuItem* volatile topDisplayedItem = NULL; // First item to display (the "MenuItem* volatile" declaration means that the volatile part is the pointer and not the content itself)
 
 bool menuChanged = false; // A flag indicating if the menù has changed and thus requires an update
-int8_t updateSelectedItem = 0; // By how much the selected value should be updated at the next menù update 
+volatile int8_t valueUpdate = 0; // By how much the selected value should be updated at the next menù update 
 
 // Not static because they are used in the LED management
 volatile uint8_t singleTarget = 0;          // Single target selected listel
@@ -192,27 +195,28 @@ static void updateSelectedItemValue(int8_t direction){
   menuChanged = true;
 }
 
-static void updateScrolling() {
-  // create snapshots of volatile pointers to make sure they don't change from a row to another
-  MenuItem* selectedSnapshot = (MenuItem*)selectedItem;
+static MenuItem* updateScrolling(MenuItem* selectedSnapshot) {
   MenuItem* topDisplayedSnapshot = (MenuItem*)topDisplayedItem;
+  MenuItem* newTop = topDisplayedSnapshot;
 
   // Verify if selected item is before top displayed item
   if (isBefore(selectedSnapshot, topDisplayedSnapshot)) {
-      topDisplayedItem = selectedSnapshot;
+      newTop = selectedSnapshot;
   }
 
   // Verify if selected item is after last displayed item
-  MenuItem* temp = topDisplayedSnapshot;
+  MenuItem* lastDisplayed = topDisplayedSnapshot;
   for (int i = 0; i < maxLines - 1; i++) {
-      if (temp->nextSibling != NULL)
-        temp = temp->nextSibling;
+      if (lastDisplayed->nextSibling != NULL){
+        lastDisplayed = lastDisplayed->nextSibling;
+      }
   }
   
-  if (isBefore(temp, selectedSnapshot)) {
-      // Se il cursore è oltre l'ultima riga, sposta topDisplayedItem al fratello successivo
-      topDisplayedItem = topDisplayedSnapshot->nextSibling;
+  if (isBefore(lastDisplayed, selectedSnapshot)) {
+      newTop = topDisplayedSnapshot->nextSibling;
   }
+
+  return newTop;
 }
 
 // Return true if item a is before item b
@@ -234,7 +238,7 @@ void IRAM_ATTR encoderAction(int8_t direction){
   MenuItem* selectedSnapshot = (MenuItem*)selectedItem;
 
   if(isValueEditingEnabled){ // modify item value
-    updateSelectedItem = direction;
+    valueUpdate = direction;
     return;
   }
 
@@ -316,27 +320,33 @@ static String getItemString(MenuItem* item) {
     return output;
 }
 
-// Print the menu on the screen buffer without showing it
-void updateMenu(){
-  updateScrolling();  // update topDisplayedItem if necessary
+static void displayAndClear(){
+  display.display();
+  display.clearDisplay();
+  display.setCursor(1,1);
+}
 
-  if(updateSelectedItem != 0)
-    updateSelectedItemValue(updateSelectedItem);
+// Print the menu on the screen buffer without showing it
+static void updateMenuUnsafe(MenuItem* selectedItemSnapshot, uint8_t valueUpdateSnapshot){
+  updateScrolling(selectedItemSnapshot);  // update topDisplayedItem if necessary
+
+  if(valueUpdateSnapshot != 0)
+    updateSelectedItemValue(valueUpdateSnapshot);
 
   MenuItem *temp = topDisplayedItem;
-
-  display.setCursor(1,1);
   
   for(int i=0;i<maxLines;i++){
     if(temp == NULL)
       break;  // make sure is a break or the menuChanged variable will remain true if there are less than maxLines items
     
     // Set item style if is the selected one
-    if(temp == selectedItem){
+    if(temp == selectedItemSnapshot){
       display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-      if(isValueEditingEnabled){
+
+      if(isValueEditingEnabled)
         display.print("> ");
-      }
+      else
+        display.print("  ");
     }
 
     display.println(getItemString(temp));
@@ -346,15 +356,35 @@ void updateMenu(){
 
     temp = temp->nextSibling;
   }
-
-  menuChanged = false;  // The menù changes has been staged in the screen buffer
-  updateSelectedItem = 0; // Reset item update
 }
 
-void displayAndClear(){
-  display.display();
-  display.clearDisplay();
-  display.setCursor(1,1);
+// This fuction 
+void updateMenuSafe() {
+    MenuItem* snapshotSelected = NULL;
+    int8_t snapshotUpdateValue = 0;
+    bool shouldProceed = false; 
+
+    // --- BRIEF ATOMIC PROTECTION ---
+    // Only use critical section to copy things and reset values
+    portENTER_CRITICAL(&myMux); 
+    if (menuChanged) {
+        shouldProceed = true;
+        menuChanged = false;
+        snapshotSelected = (MenuItem*)selectedItem;
+        snapshotUpdateValue = valueUpdate;
+        valueUpdate = 0;
+    }
+    portEXIT_CRITICAL(&myMux);
+    // ---
+    
+    if(shouldProceed){
+      // Now it's safe to call logic things by passing copyed values
+      // Now the watchdog shoud be happy
+      topDisplayedItem = updateScrolling(snapshotSelected); // This can be done here because pinter assign in an ESP32 is atomic
+
+      updateMenuUnsafe(snapshotSelected, snapshotUpdateValue);
+      displayAndClear();
+    }
 }
 
 bool isMenuChanged(){
