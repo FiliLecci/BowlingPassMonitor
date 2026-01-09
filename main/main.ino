@@ -20,6 +20,8 @@ const uint16_t laneWidth = 1070;  //mm
 // Variables for encoder reading function
 unsigned long _lastIncReadTime = micros();
 unsigned long _lastDecReadTime = micros();
+unsigned long _lastSelTime = micros();
+unsigned long _lastMenuTime = micros();
 int _pauseLength = 25000;
 int _fastIncrement = 10;
 
@@ -160,12 +162,26 @@ void IRAM_ATTR read_encoder() {
   }
 }
 
+void IRAM_ATTR btnSelectPressed(){
+  if((micros() - _lastSelTime) > _pauseLength) {
+    _lastSelTime = micros();
+    selectBtnPress();
+  }
+}
+
+void IRAM_ATTR btnMenuPressed(){
+  if((micros() - _lastMenuTime) > _pauseLength) {
+    _lastMenuTime = micros();
+    prevMenuAction();
+  }
+}
+
 void setupInputs() {
   pinMode(MENU_BTN_PIN, INPUT_PULLUP);
-  attachInterrupt(MENU_BTN_PIN, prevMenuAction, RISING);
+  attachInterrupt(MENU_BTN_PIN, btnMenuPressed, FALLING);
 
   pinMode(SELECT_BTN_PIN, INPUT_PULLUP);
-  attachInterrupt(SELECT_BTN_PIN, selectBtnPress, RISING);
+  attachInterrupt(SELECT_BTN_PIN, btnSelectPressed, FALLING);
 
   pinMode(ENC_A, INPUT_PULLUP);
   pinMode(ENC_B, INPUT_PULLUP);
@@ -342,5 +358,5 @@ void loop() {
     digitalWrite(2, LOW);
   }
 
-  delay(50);
+  delay(10);
 }
