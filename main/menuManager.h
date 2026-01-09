@@ -50,7 +50,7 @@ const uint8_t maxLines = 4; // Maximum writable lines on the screen
 MenuItem* volatile topDisplayedItem = NULL; // First item to display (the "MenuItem* volatile" declaration means that the volatile part is the pointer and not the content itself)
 
 bool menuChanged = false; // A flag indicating if the menù has changed and thus requires an update
-volatile int8_t valueUpdate = 0; // By how much the selected value should be updated at the next menù update 
+static volatile int8_t valueUpdate = 0; // By how much the selected value should be updated at the next menù update 
 
 // Not static because they are used in the LED management
 volatile uint8_t singleTarget = 0;          // Single target selected listel
@@ -234,13 +234,14 @@ static bool isBefore(MenuItem* a, MenuItem* b) {
 }
 
 void IRAM_ATTR encoderAction(int8_t direction){
-  // create snapshots of volatile pointers to make sure they don't change from a row to another
-  MenuItem* selectedSnapshot = (MenuItem*)selectedItem;
-
   if(isValueEditingEnabled){ // modify item value
-    valueUpdate = direction;
+    valueUpdate += direction;
+    menuChanged = true;
     return;
   }
+
+  // create snapshots of volatile pointers to make sure they don't change from a row to another
+  MenuItem* selectedSnapshot = (MenuItem*)selectedItem;
 
   if(direction == 1){  // clockwise
     if(selectedSnapshot->nextSibling == NULL){ // Check if next sibling is present
