@@ -24,6 +24,8 @@ unsigned long _lastSelTime = micros();
 unsigned long _lastMenuTime = micros();
 int _pauseLength = 25000;
 int _fastIncrement = 10;
+bool _selBtnPressed = false;
+bool _menuBtnPressed = false;
 
 volatile int test = 0;
 
@@ -165,6 +167,11 @@ void IRAM_ATTR read_encoder() {
 void IRAM_ATTR btnSelectPressed(){
   if((micros() - _lastSelTime) > _pauseLength) {
     _lastSelTime = micros();
+    if(_selBtnPressed){
+      _selBtnPressed = false;
+      return;
+    }
+    _selBtnPressed = true;
     selectBtnPress();
   }
 }
@@ -172,6 +179,11 @@ void IRAM_ATTR btnSelectPressed(){
 void IRAM_ATTR btnMenuPressed(){
   if((micros() - _lastMenuTime) > _pauseLength) {
     _lastMenuTime = micros();
+    if(_menuBtnPressed){
+      _menuBtnPressed = false;
+      return;
+    }
+    _menuBtnPressed = true;
     prevMenuAction();
   }
 }
