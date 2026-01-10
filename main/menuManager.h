@@ -61,9 +61,9 @@ static MenuItem* volatile selectedItem = NULL;        // Current menu position
 
 // ITEMS VALUES
 
-static ItemValue singleTargetValue  = {&singleTarget, UINT8, 1, 39, 1};
-static ItemValue rangeLeftValue     = {&range[0], UINT8, 1, 39, 1};
-static ItemValue rangeRightValue     = {&range[1], UINT8, 1, 39, 1};
+static ItemValue singleTargetValue  = {&singleTarget, UINT8, 1, NUM_LISTELS, 1};
+static ItemValue rangeLeftValue     = {&range[0], UINT8, 1, NUM_LISTELS, 1};
+static ItemValue rangeRightValue     = {&range[1], UINT8, 1, NUM_LISTELS, 1};
 
 // MENU ITEMS
 
@@ -327,7 +327,7 @@ static void displayAndClear(){
   display.setCursor(1,1);
 }
 
-// Print the menu on the screen buffer without showing it
+// Print the menu on the screen buffer
 static void updateMenuUnsafe(MenuItem* selectedItemSnapshot, uint8_t valueUpdateSnapshot){
   updateScrolling(selectedItemSnapshot);  // update topDisplayedItem if necessary
 
@@ -359,7 +359,7 @@ static void updateMenuUnsafe(MenuItem* selectedItemSnapshot, uint8_t valueUpdate
   }
 }
 
-// This fuction 
+// This fuction updates the menu by also taking care of critical parts.
 void updateMenuSafe() {
     MenuItem* snapshotSelected = NULL;
     int8_t snapshotUpdateValue = 0;
@@ -384,7 +384,6 @@ void updateMenuSafe() {
       topDisplayedItem = updateScrolling(snapshotSelected); // This can be done here because pinter assign in an ESP32 is atomic
 
       updateMenuUnsafe(snapshotSelected, snapshotUpdateValue);
-      displayAndClear();
     }
 }
 

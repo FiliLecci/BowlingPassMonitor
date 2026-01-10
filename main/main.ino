@@ -1,9 +1,8 @@
 #include <SPI.h>
 #include <Wire.h>
-#include <VL53L1X.h>
-#include <Adafruit_NeoPixel.h>
 
 #include "menuManager.h"
+#include "ledManager.h"
 #include "config.h"
 
 VL53L1X sensor_left;
@@ -11,11 +10,6 @@ VL53L1X sensor_right;
 
 // Mutex for menu manager to be used
 portMUX_TYPE myMux = portMUX_INITIALIZER_UNLOCKED;
-
-Adafruit_NeoPixel strip(2, STRIP_PIN, NEO_GRB + NEO_KHZ800);
-
-const uint16_t numListels = 39;
-const uint16_t laneWidth = 1070;  //mm
 
 // Variables for encoder reading function
 unsigned long _lastIncReadTime = micros();
@@ -27,7 +21,10 @@ int _fastIncrement = 10;
 bool _selBtnPressed = false;
 bool _menuBtnPressed = false;
 
-volatile int test = 0;
+// sensors distances
+int16_t leftLastValidDistance = 0;
+int16_t rightLastValidDistance = 0;
+int16_t lastValidDistance = 0;
 
 void scanI2C1() {
   byte error, address;
@@ -112,20 +109,6 @@ void setupSensors() {
   Wire.setClock(400000);
 
   Serial.println(F("VL53L1X sensors OK!"));
-}
-
-void setupLedStrip() {
-  Serial.println("Starting LED strip init...");
-
-  //init led
-  strip.begin();
-
-  strip.setBrightness(100);
-  strip.fill(strip.Color(0, 255, 0), 0, 2);
-
-  Serial.println("LED strip init success.");
-
-  strip.show();
 }
 
 // code from https://github.com/mo-thunderz/RotaryEncoder/blob/main/Arduino/ArduinoRotaryEncoder/ArduinoRotaryEncoder.ino
@@ -228,10 +211,6 @@ void startRightSensor() {
   Serial.println(F("Right ranging started"));
 }
 
-int16_t leftLastValidDistance = 0;
-int16_t rightLastValidDistance = 0;
-int16_t lastValidDistance = 0;
-
 // Fetch the sensor measurement and update the leftLastvalidDistance variable.
 bool getLeftSensorReading() {
   int16_t distance = 0;
@@ -283,7 +262,7 @@ bool getRightSensorReading() {
 // Given a distance from a lane side (doesn't matter which) in mm, returns the closest listel to that point.
 // This function doesn't account for gutter width
 uint8_t distanceToListel(float distance) {
-  return round(distance / (laneWidth / numListels));
+  return round(distance / (LANE_WIDTH / NUM_LISTELS));
 }
 
 // Calculate the ball center position from the LEFT of the bowling lane.
@@ -310,17 +289,6 @@ bool calculateBallCenter() {
   lastValidDistance = (laneLeftPos + laneRightPos) / 2;  // average of the two calculated centers
 
   return true;
-}
-
-void updateLEDStrip() {
-  // Free mode
-  uint8_t colorR = map(leftLastValidDistance, 0, LANE_WIDTH, 0, 255);
-  uint8_t colorG = map(leftLastValidDistance, 0, LANE_WIDTH, 255, 0);
-
-  strip.fill(strip.Color(colorR, colorG, 0), 0, 2);
-  // Single target mode
-
-  // Range mode
 }
 
 void setup() {
@@ -352,23 +320,24 @@ void loop() {
   // Serial.printf("%d | %d | %d\n", leftLastValidDistance, rightLastValidDistance, lastValidDistance);
 
   //drawBars(leftLastValidDistance-GUTTER_WIDTH, rightLastValidDistance-GUTTER_WIDTH, lastValidDistance);
-  // displayAndClear();
+  //displayAndClear();
 
   // LED strip logic
-  // updateLEDStrip();
-  // strip.show();
-
+  updateLEDStrip(distanceToListel(lastValidDistance));
+  
   if (isMenuChanged()) {
     Serial.println("Updating menu...");
-
+    
     updateMenuSafe();
-
+    
     Serial.println("Done.");
-
+    
     digitalWrite(2, HIGH);
     delay(100);
     digitalWrite(2, LOW);
   }
-
+  
+  displayAndClear();
+  stripShow();
   delay(10);
 }
