@@ -4,7 +4,7 @@ An arduino project that uses 2 VL53L1X sensors and an array of 39 addressable LE
 ## Menu
 The menu is structured kinda like an n-ary tree:
 
-![Menu structure](/imgs/menu_scheme.svg)
+![Menu structure](/imgs/menu_diagram.svg)
 
 When the menu is first loaded the `selectedItem` variable points to the `Root` item.
 
