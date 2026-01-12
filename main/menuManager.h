@@ -52,9 +52,8 @@ MenuItem* volatile topDisplayedItem = NULL; // First item to display (the "MenuI
 bool menuChanged = false; // A flag indicating if the menù has changed and thus requires an update
 static volatile int8_t valueUpdate = 0; // By how much the selected value should be updated at the next menù update 
 
-// Not static because they are used in the LED management
-volatile uint8_t singleTarget = 0;          // Single target selected listel
-volatile uint8_t range[2] = {0,0};          // Range left and right selected listels
+static volatile uint8_t singleTarget = 0;          // Single target selected listel
+static volatile uint8_t range[2] = {0,0};          // Range left and right selected listels
 
 static volatile bool isValueEditingEnabled = false;   // Allow to modify selected value (if possible)
 static MenuItem* volatile selectedItem = NULL;        // Current menu position
@@ -387,8 +386,19 @@ void updateMenuSafe() {
     }
 }
 
-bool isMenuChanged(){
+inline bool isMenuChanged(){
   return menuChanged;
+}
+
+inline uint8_t getSingleTarget() {
+    return (uint8_t)singleTarget; 
+}
+
+inline void getSelectedRange(uint8_t destination[2]) {
+    portENTER_CRITICAL(&myMux);
+    destination[0] = range[0];
+    destination[1] = range[1];
+    portEXIT_CRITICAL(&myMux);
 }
 
 // Custom displayed things

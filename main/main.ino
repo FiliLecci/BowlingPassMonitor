@@ -317,11 +317,6 @@ void setup() {
 void loop() {
   calculateBallCenter();
 
-  // Serial.printf("%d | %d | %d\n", leftLastValidDistance, rightLastValidDistance, lastValidDistance);
-
-  //drawBars(leftLastValidDistance-GUTTER_WIDTH, rightLastValidDistance-GUTTER_WIDTH, lastValidDistance);
-  //displayAndClear();
-
   // LED strip logic
   updateLEDStrip(distanceToListel(lastValidDistance));
   

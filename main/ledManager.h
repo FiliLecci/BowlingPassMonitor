@@ -19,7 +19,7 @@ void setupLedStrip() {
   strip.show();
 }
 
-void updateLEDStrip(uint8_t listel) {
+void updateLEDStrip(uint8_t listel, uint8_t  mode) {
   // Free mode
   uint8_t colorR = map(listel, 1, NUM_LISTELS, 0, 255);
   uint8_t colorG = map(listel, 1, NUM_LISTELS, 255, 0);
