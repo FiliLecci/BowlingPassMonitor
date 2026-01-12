@@ -35,10 +35,10 @@ struct MenuItem {
 // Mutex for atomic operations
 extern portMUX_TYPE myMux;
 
-// FUNCTIONS PROTOTYPES FOR FOLLOWING MENU ITEMS ACTIONS
-static void selectSubMenuAction();
+// FUNCTIONS PROTOTYPES FOR FOLLOWING MENU ITEMS ACTIONS. They should be set as IRAM_ATTR since called in interrupt
+static void IRAM_ATTR selectSubMenuAction();
 
-static void toggleValueEditingAction();
+static void IRAM_ATTR toggleValueEditingAction();
 
 
 static String getItemString(MenuItem* item); // Keep this here because Arduino is stupid and doesn't see the struct
@@ -262,7 +262,7 @@ void IRAM_ATTR encoderAction(int8_t direction){
   menuChanged = true;
 }
 
-static void selectSubMenuAction(){
+static void IRAM_ATTR selectSubMenuAction(){
   selectedItem = selectedItem->firstChild;
   topDisplayedItem = selectedItem;
   menuChanged = true;
@@ -275,7 +275,7 @@ void IRAM_ATTR prevMenuAction(){
   menuChanged = true;
 }
 
-static void toggleValueEditingAction(){
+static void IRAM_ATTR toggleValueEditingAction(){
   isValueEditingEnabled = !isValueEditingEnabled;
   menuChanged = true;
 }
