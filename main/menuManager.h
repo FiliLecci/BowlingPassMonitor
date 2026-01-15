@@ -45,9 +45,9 @@ static String getItemString(MenuItem* item); // Keep this here because Arduino i
 static bool isBefore(MenuItem* a, MenuItem* b);  // This also
 
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire1, OLED_RESET);
-const uint8_t maxLines = 4; // Maximum writable lines on the screen 
-MenuItem* volatile topDisplayedItem = NULL; // First item to display (the "MenuItem* volatile" declaration means that the volatile part is the pointer and not the content itself)
+static Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire1, OLED_RESET);
+static const uint8_t maxLines = 4; // Maximum writable lines on the screen 
+static MenuItem* volatile topDisplayedItem = NULL; // First item to display (the "MenuItem* volatile" declaration means that the volatile part is the pointer and not the content itself)
 
 bool menuChanged = false; // A flag indicating if the menù has changed and thus requires an update
 static volatile int8_t valueUpdate = 0; // By how much the selected value should be updated at the next menù update 
@@ -59,7 +59,6 @@ static volatile bool isValueEditingEnabled = false;   // Allow to modify selecte
 static MenuItem* volatile selectedItem = NULL;        // Current menu position
 
 // ITEMS VALUES
-
 static ItemValue singleTargetValue  = {&singleTarget, UINT8, 1, NUM_LISTELS, 1};
 static ItemValue rangeLeftValue     = {&range[0], UINT8, 1, NUM_LISTELS, 1};
 static ItemValue rangeRightValue     = {&range[1], UINT8, 1, NUM_LISTELS, 1};
@@ -320,10 +319,15 @@ static String getItemString(MenuItem* item) {
     return output;
 }
 
+static bool itemsEqual(MenuItem* i1, MenuItem* i2){
+  return i1 == i2;
+}
+
 static void displayAndClear(){
   display.display();
   display.clearDisplay();
   display.setCursor(1,1);
+  menuChanged = false;
 }
 
 // Print the menu on the screen buffer
@@ -394,11 +398,29 @@ inline uint8_t getSingleTarget() {
     return (uint8_t)singleTarget; 
 }
 
-inline void getSelectedRange(uint8_t destination[2]) {
+inline void getRange(uint8_t destination[2]) {
     portENTER_CRITICAL(&myMux);
     destination[0] = range[0];
     destination[1] = range[1];
     portEXIT_CRITICAL(&myMux);
+}
+
+inline uint8_t getMode(){
+  uint8_t mode = 0;
+
+  portENTER_CRITICAL(&myMux);
+  if(itemsEqual((MenuItem*)selectedItem, &freeMode)){
+    mode = 1;
+  }
+  else if(itemsEqual((MenuItem*)selectedItem, &singleTargetMode)){
+    mode = 2;
+  }
+  else if(itemsEqual((MenuItem*)selectedItem, &rangeMode)){
+    mode = 3;
+  }
+  portEXIT_CRITICAL(&myMux);
+
+  return mode;
 }
 
 // Custom displayed things

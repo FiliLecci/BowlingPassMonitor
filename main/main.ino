@@ -318,6 +318,7 @@ void loop() {
   calculateBallCenter();
 
   // LED strip logic
+  
   updateLEDStrip(distanceToListel(lastValidDistance));
   
   if (isMenuChanged()) {

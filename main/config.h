@@ -12,7 +12,7 @@
 
 // LED STRIP DIN PIN
 #define STRIP_PIN 23        // the pin to wich the strip is connected
-#define NUM_LED 2           // total number of LEDs
+#define NUM_LED 4           // total number of LEDs
 #define LED_SPACING 25.4    // mm (default is 1in = 25.4mm)
 
 // BUTTONS AND ENCODER PARAMS
