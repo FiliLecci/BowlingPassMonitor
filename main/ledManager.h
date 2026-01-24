@@ -1,7 +1,6 @@
-#include <VL53L1X.h>
 #include <Adafruit_NeoPixel.h>
 
-#include "config.h"
+#include "./config.h"
 
 Adafruit_NeoPixel strip(NUM_LED, STRIP_PIN, NEO_GRB + NEO_KHZ800);
 
@@ -22,8 +21,6 @@ void setupLedStrip() {
 static uint8_t color = 0;
 static int8_t dir = 1; 
 static uint8_t lastMode = 0;
-
-// Variables to keep 
 
 static void updateMode(uint8_t  mode) {
   lastMode = mode;

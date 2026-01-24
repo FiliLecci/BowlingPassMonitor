@@ -1,8 +1,9 @@
 #include <SPI.h>
 #include <Wire.h>
+#include <VL53L1X.h>
 
 #include "menuManager.h"
-#include "ledManager.h"
+#include "./ledManager.h"
 #include "config.h"
 
 VL53L1X sensor_left;
@@ -318,13 +319,14 @@ void loop() {
   calculateBallCenter();
 
   // LED strip logic
-  
+  updateMode(getMode());
   updateLEDStrip(distanceToListel(lastValidDistance));
   
   if (isMenuChanged()) {
     Serial.println("Updating menu...");
     
     updateMenuSafe();
+    displayAndClear();
     
     Serial.println("Done.");
     
@@ -333,7 +335,6 @@ void loop() {
     digitalWrite(2, LOW);
   }
   
-  displayAndClear();
   stripShow();
   delay(10);
 }
