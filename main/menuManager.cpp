@@ -198,6 +198,23 @@ static MenuItem* updateScrolling(MenuItem* selectedSnapshot) {
       newTop = topDisplayedSnapshot->nextSibling;
   }
 
+  // Check if the current menu fills the screen (if there are enough items)
+  MenuItem* temp = newTop;
+
+  for (int i = 0; i < maxLines - 1; i++) {
+    if (temp->nextSibling != NULL){
+      temp = temp->nextSibling;
+    }
+    
+    // if there are not enough items to fill the screen, try to move top item up
+    if(newTop->prevSibling != NULL){
+      newTop = newTop->prevSibling;
+    }
+    else{
+      break; // can't move up anymore
+    }
+  }
+
   return newTop;
 }
 
@@ -296,6 +313,7 @@ static void updateMenuUnsafe(MenuItem* selectedItemSnapshot, uint8_t valueUpdate
   if(valueUpdateSnapshot != 0)
     updateSelectedItemValue(valueUpdateSnapshot);
 
+  // Display menu items from top to top+maxLines 
   MenuItem *temp = topDisplayedItem;
   
   for(int i=0;i<maxLines;i++){

@@ -37,23 +37,31 @@ extern portMUX_TYPE myMux;
 // A flag indicating if the menu has changed and thus requires an update
 extern bool menuChanged;
 
-
+// initialize display and I2C wire
 void setupScreen();
 
+// setup menu structure
 void initMenu();
 
+// perform current menu item action
 void selectBtnPress();
 
+// handle encoder rotation
 void encoderAction(int8_t direction);
 
+// go back to parent menu
 void prevMenuAction();
 
+// update the menu display safely using critical sections
 void updateMenuSafe();
 
+// display content of screen buffer, clear buffer and reset cursor
 void displayAndClear();
 
+// draw a visual representation of the distances as bars and ball center
 void drawBars(uint16_t leftD, uint16_t rightD, uint16_t centerP);
 
+// check if menu has changed
 bool isMenuChanged();
 
 uint8_t getSingleTarget();
