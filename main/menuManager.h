@@ -64,8 +64,8 @@ void drawBars(uint16_t leftD, uint16_t rightD, uint16_t centerP);
 // check if menu has changed
 bool isMenuChanged();
 
-uint8_t getSingleTarget();
+volatile uint8_t* getSingleTargetPtr();
 
-void getRange(uint8_t destination[2]);
+volatile uint8_t* getRangePtr();
 
 uint8_t getMode();

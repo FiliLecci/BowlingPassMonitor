@@ -306,6 +306,8 @@ void setup() {
   setupInputs();
 
   setupLedStrip();
+  setLEDSingleTargetBinder(getSingleTargetPtr());
+  setLEDRangeBinder(getRangePtr());
 
   setupScreen();
 
@@ -316,11 +318,7 @@ void setup() {
 }
 
 void loop() {
-  calculateBallCenter();
-
-  // LED strip logic
-  updateMode(getMode());
-  updateLEDStrip(distanceToListel(lastValidDistance));
+  bool positionUpdate = calculateBallCenter();
   
   if (isMenuChanged()) {
     Serial.println("Updating menu...");
@@ -330,11 +328,17 @@ void loop() {
     
     Serial.println("Done.");
     
+    // mode might have been changed
+    updateMode(getMode());
+    
     digitalWrite(2, HIGH);
     delay(100);
     digitalWrite(2, LOW);
   }
   
+  // LED strip logic
+  updateLEDStrip(positionUpdate ? distanceToListel(lastValidDistance) : -1); // if position was updated send position
   stripShow();
+
   delay(10);
 }

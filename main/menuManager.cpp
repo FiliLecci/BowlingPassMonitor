@@ -9,8 +9,8 @@ static MenuItem* volatile topDisplayedItem = NULL; // First item to display (the
 
 static volatile int8_t valueUpdate = 0; // By how much the selected value should be updated at the next menù update 
 
-static volatile uint8_t singleTarget = 0;          // Single target selected listel
-static volatile uint8_t range[2] = {0,0};          // Range left and right selected listels
+static volatile uint8_t singleTarget = 1;          // Single target selected listel
+static volatile uint8_t range[2] = {1,2};          // Range left and right selected listels
 
 static volatile bool isValueEditingEnabled = false;   // Allow to modify selected value (if possible)
 static MenuItem* volatile selectedItem = NULL;        // Current menu position
@@ -371,31 +371,30 @@ bool isMenuChanged(){
   return menuChanged;
 }
 
-uint8_t getSingleTarget(){
-    return (uint8_t)singleTarget; 
+volatile uint8_t* getSingleTargetPtr(){
+    return &singleTarget; 
 }
 
-void getRange(uint8_t destination[2]) {
-    portENTER_CRITICAL(&myMux);
-    destination[0] = range[0];
-    destination[1] = range[1];
-    portEXIT_CRITICAL(&myMux);
+volatile uint8_t* getRangePtr() {
+  return range;
 }
 
 uint8_t getMode(){
   uint8_t mode = 0;
 
   portENTER_CRITICAL(&myMux);
-  if(itemsEqual((MenuItem*)selectedItem, &freeMode)){
+  MenuItem* selectedSnapshot = (MenuItem*)selectedItem;
+  portEXIT_CRITICAL(&myMux);
+
+  if(itemsEqual(selectedSnapshot, &freeMode)){
     mode = 1;
   }
-  else if(itemsEqual((MenuItem*)selectedItem, &singleTargetMode)){
+  else if(itemsEqual(selectedSnapshot, &singleTargetMode)){
     mode = 2;
   }
-  else if(itemsEqual((MenuItem*)selectedItem, &rangeMode)){
+  else if(itemsEqual(selectedSnapshot, &rangeMode)){
     mode = 3;
   }
-  portEXIT_CRITICAL(&myMux);
 
   return mode;
 }
