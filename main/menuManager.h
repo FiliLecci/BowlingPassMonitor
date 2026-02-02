@@ -8,7 +8,13 @@
 
 #pragma once
 
-enum DataType {INT, UINT8, UINT16, FLOAT, BOOL};
+enum DataType : uint8_t {INT, UINT8, UINT16, FLOAT, BOOL};
+
+enum SetupState : uint8_t {
+  SETUP_PENDING,
+  SETUP_OK,
+  SETUP_ERROR
+};
 
 // Refer to README on how this structure can be visualized
 struct ItemValue {
@@ -69,3 +75,8 @@ volatile uint8_t* getSingleTargetPtr();
 volatile uint8_t* getRangePtr();
 
 uint8_t getMode();
+
+void setLeftSensorStatus(uint8_t state);
+void setRightSensorStatus(uint8_t state);
+void setLedStripStatus(uint8_t state);
+void drawSetupStatus();

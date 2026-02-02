@@ -79,6 +79,9 @@ void setupSensors() {
 
   sensor_left.setBus(&Wire);
   if (!sensor_left.init()) {
+    setLeftSensorStatus(SETUP_ERROR);
+    drawSetupStatus();
+
     Serial.print(F("Error on init of left VL sensor."));
     while (1)
       delay(100);
@@ -87,6 +90,9 @@ void setupSensors() {
 
   Serial.print(F("Sensor left ID: 0x"));
   Serial.println(sensor_left.getAddress(), HEX);
+
+  setLeftSensorStatus(SETUP_OK);
+  drawSetupStatus();
 
   // setup right sensor
   // Wake up right sensor
@@ -97,6 +103,9 @@ void setupSensors() {
 
   sensor_right.setBus(&Wire);
   if (!sensor_right.init()) {
+    setRightSensorStatus(SETUP_ERROR);
+    drawSetupStatus();
+
     Serial.print(F("Error on init of right VL sensor."));
     while (1)
       delay(100);
@@ -106,6 +115,9 @@ void setupSensors() {
   // SENSORS SETUP COMPLETE
   Serial.print(F("Sensor right ID: 0x"));
   Serial.println(sensor_right.getAddress(), HEX);
+
+  setRightSensorStatus(SETUP_OK);
+  drawSetupStatus();
 
   Wire.setClock(400000);
 
@@ -298,19 +310,25 @@ void setup() {
   Serial.begin(115200);
   while (!Serial) delay(10);
 
+  setupScreen();
+  drawSetupStatus();
+
   setupSensors();
 
   startLeftSensor();
   startRightSensor();
-
+  
   setupInputs();
 
   setupLedStrip();
   setLEDSingleTargetBinder(getSingleTargetPtr());
   setLEDRangeBinder(getRangePtr());
+  setLedStripStatus(SETUP_OK);
+  drawSetupStatus();
 
-  setupScreen();
+  delay(1000);
 
+  displayAndClear();
   initMenu();
 
   scanI2C1();

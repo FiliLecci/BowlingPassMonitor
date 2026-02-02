@@ -7,6 +7,11 @@ static Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire1, OLED_RESET)
 static const uint8_t maxLines = 4; // Maximum writable lines on the screen 
 static MenuItem* volatile topDisplayedItem = NULL; // First item to display (the "MenuItem* volatile" declaration means that the volatile part is the pointer and not the content itself)
 
+// Setup state
+static SetupState sensorLeftState  = SETUP_PENDING;
+static SetupState sensorRightState = SETUP_PENDING;
+static SetupState ledStripState    = SETUP_PENDING;
+
 static volatile int8_t valueUpdate = 0; // By how much the selected value should be updated at the next menù update 
 
 static volatile uint8_t singleTarget = 1;          // Single target selected listel
@@ -63,6 +68,7 @@ void setupScreen(){
 
   // Clear the buffer
   display.clearDisplay();
+
 }
 
 void initMenu(){
@@ -411,4 +417,44 @@ void drawBars(uint16_t leftD, uint16_t rightD, uint16_t centerP){
   display.fillRect(0, 10, barL, 6, SSD1306_WHITE);
   display.fillRect(SCREEN_WIDTH-barR, 10, barR, 6, SSD1306_WHITE);
   display.drawCircle(center, 13, 2, SSD1306_WHITE);
+}
+
+static const char* stateIcon(SetupState s) {
+  switch (s) {
+    case SETUP_OK:    return "[Y]";
+    case SETUP_ERROR: return "[X]";
+    default:          return "[~]";
+  }
+}
+
+void drawSetupStatus() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 0);
+  display.print("[SX] Sensor  ");
+  display.println(stateIcon(sensorLeftState));
+
+  display.setCursor(0, 10);
+  display.print("[DX] Sensor  ");
+  display.println(stateIcon(sensorRightState));
+
+  display.setCursor(0, 20);
+  display.print("[LED] Strip  ");
+  display.println(stateIcon(ledStripState));
+
+  display.display();
+}
+
+void setLeftSensorStatus(uint8_t state) {
+  sensorLeftState = (SetupState)state;
+}
+
+void setRightSensorStatus(uint8_t state) {
+  sensorRightState = (SetupState)state;
+}
+
+void setLedStripStatus(uint8_t state) {
+  ledStripState = (SetupState)state;
 }
