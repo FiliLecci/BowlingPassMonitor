@@ -55,6 +55,7 @@ void setupScreen(){
   Serial.println("Starting display...");
 
   Wire1.begin(SDA_2, SCL_2);
+  Wire1.setClock(100000); // Set I2C frequency to 100kHz for display
 
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println(F("SSD1306 allocation failed"));

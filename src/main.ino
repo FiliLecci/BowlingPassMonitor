@@ -305,10 +305,10 @@ bool calculateBallCenter() {
 }
 
 void setup() {
-  pinMode(2, OUTPUT);
+  pinMode(INT_LED_PIN, OUTPUT);
 
   Serial.begin(115200);
-  while (!Serial) delay(10);
+  // while (!Serial) delay(10);
 
   setupScreen();
   drawSetupStatus();
@@ -349,9 +349,9 @@ void loop() {
     // mode might have been changed
     updateMode(getMode());
     
-    digitalWrite(2, HIGH);
+    digitalWrite(INT_LED_PIN, HIGH);
     delay(100);
-    digitalWrite(2, LOW);
+    digitalWrite(INT_LED_PIN, LOW);
   }
   
   // LED strip logic
