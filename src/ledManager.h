@@ -7,9 +7,6 @@ Adafruit_NeoPixel strip(NUM_LED, STRIP_PIN, NEO_GRB + NEO_KHZ800);
 static volatile uint8_t* singleTargetBinder;
 static volatile uint8_t* rangeBinder;
 
-static unsigned long lastUpdate = 0;          // used to reset LEDs to default mode
-static unsigned long updateTimeMillis = 10000; // time before reset
-
 void setupLedStrip() {
   Serial.println("Starting LED strip init...");
 
@@ -69,20 +66,10 @@ static void showRangeMode(uint8_t ballListel) {
 void updateLEDStrip(uint8_t ballListel) {
   uint8_t tempListel = ballListel;
 
-  // If position was not updated for updateTimeMillis milliseconds reset ball position
+  // If position was not updated reset ball position
   if (ballListel == -1){
-    if(millis() - lastUpdate >= updateTimeMillis){
-      tempListel = 0;
-    }
-    else{
-      return;
-    }
+    tempListel = 0;
   }
-  else{
-    lastUpdate = millis();
-  }
-
-  strip.fill(strip.Color(0, 0, 0), 0, NUM_LED);
   
   switch (lastMode) {
     // Free mode
@@ -103,6 +90,13 @@ void updateLEDStrip(uint8_t ballListel) {
   }
 }
 
+// [DEBUG] set a led to a specific color
+void debugIndicator(uint8_t ballListel, uint32_t color){
+  strip.setPixelColor(ballListel-1, color);
+}
+
+// Show current LED state and reset strip to all off for next update
 void stripShow(){
   strip.show();
+  strip.fill(strip.Color(0, 0, 0), 0, NUM_LED);
 }

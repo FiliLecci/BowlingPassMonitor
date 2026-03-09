@@ -25,7 +25,15 @@ bool _menuBtnPressed = false;
 // sensors distances
 int16_t leftLastValidDistance = 0;
 int16_t rightLastValidDistance = 0;
-int16_t lastValidDistance = 0;
+int16_t lastCalculatedCenter = 0;
+uint16_t *leftDistanceBuffer; // buffer with left distances used to calculate the average position
+uint16_t *rightDistanceBuffer; // buffer with right distances used to calculate the average position
+uint8_t bufferSize = 0;
+// used to buffer data
+unsigned long _lastMeasurementTime = 0; // last valid measurement time for both sensors
+unsigned long updateTimeMillis = 500;   // time with no new data after which the position is calculated
+unsigned long positionResetTime = 10000; // time with no new data after which the position is reset to avoid showing stale data
+bool bufferCalculated = false; // flag to know if the position has been calculated with the buffer data
 
 void scanI2C1() {
   byte error, address;
@@ -275,33 +283,75 @@ bool getRightSensorReading() {
 // Given a distance from a lane side (doesn't matter which) in mm, returns the closest listel to that point.
 // This function doesn't account for gutter width
 uint8_t distanceToListel(float distance) {
+  if(distance < 0)
+    return -1; // invalid distance, return -1 to indicate no position
   return round(distance / (LANE_WIDTH / NUM_LISTELS));
 }
 
-// Calculate the ball center position from the LEFT of the bowling lane.
-bool calculateBallCenter() {
-  if (!getLeftSensorReading())
+// Read sensor data and, if both are valid, add the readings to the respective buffers.
+bool readSensorData() {
+  bool leftUpdated = getLeftSensorReading();
+
+  if(!leftUpdated)
     return false;
 
-  if (!getRightSensorReading())
-    return false;
-
-  // Check if measurements are valid
+  // check left measurement is within the lane limits (considering the gutter and the ball diameter)
   if (leftLastValidDistance < GUTTER_WIDTH - (BALL_DIAMETER / 2) || leftLastValidDistance > LANE_WIDTH + GUTTER_WIDTH) {
     return false;
   }
 
+  bool rightUpdated = getRightSensorReading();
+
+  if (!rightUpdated)
+    return false;
+  
+    // check right measurement is valid
   if (rightLastValidDistance < GUTTER_WIDTH - (BALL_DIAMETER / 2) || rightLastValidDistance > LANE_WIDTH + GUTTER_WIDTH) {
     return false;
   }
 
-  // estimated center position from the left side of the lane from sensors raw data
-  int16_t laneLeftPos = leftLastValidDistance - GUTTER_WIDTH + (BALL_DIAMETER / 2);
-  int16_t laneRightPos = LANE_WIDTH - (rightLastValidDistance - GUTTER_WIDTH + (BALL_DIAMETER / 2));
+  // both sensors data has been read and validated, we can update the buffers with the new data
+  leftDistanceBuffer = (uint16_t*) realloc(leftDistanceBuffer, sizeof(uint16_t) * (bufferSize + 1));  
+  rightDistanceBuffer = (uint16_t*) realloc(rightDistanceBuffer, sizeof(uint16_t) * (bufferSize + 1));
 
-  lastValidDistance = (laneLeftPos + laneRightPos) / 2;  // average of the two calculated centers
+  leftDistanceBuffer[bufferSize] = leftLastValidDistance;
+  rightDistanceBuffer[bufferSize] = rightLastValidDistance;
+
+  bufferSize++;
 
   return true;
+}
+
+void resetBuffers() {
+  bufferSize = 0;
+  free(leftDistanceBuffer);
+  free(rightDistanceBuffer);
+  leftDistanceBuffer = (uint16_t*) malloc(sizeof(uint16_t) * bufferSize);
+  rightDistanceBuffer = (uint16_t*) malloc(sizeof(uint16_t) * bufferSize);
+}
+
+// Calculate the ball center position from the LEFT of the bowling lane.
+int16_t calculateBallCenter() {
+  // average the distances in the buffers to get a more stable position
+  uint32_t leftSum = 0;
+  uint32_t rightSum = 0;
+
+  for (uint8_t i = 0; i < bufferSize; i++) {
+    leftSum += leftDistanceBuffer[i];
+  }
+  for (uint8_t i = 0; i < bufferSize; i++) {
+    rightSum += rightDistanceBuffer[i];
+  }
+
+  uint16_t leftAverage = leftSum / bufferSize;
+  uint16_t rightAverage = rightSum / bufferSize;
+
+  // estimated center position from the left side of the lane from sensors raw data
+  int16_t laneLeftPos = leftAverage - GUTTER_WIDTH + (BALL_DIAMETER / 2);
+  int16_t laneRightPos = LANE_WIDTH - (rightAverage - GUTTER_WIDTH + (BALL_DIAMETER / 2));
+
+  lastCalculatedCenter = (laneLeftPos + laneRightPos) / 2;  // average of the two calculated centers
+  return lastCalculatedCenter;
 }
 
 void setup() {
@@ -314,6 +364,11 @@ void setup() {
   drawSetupStatus();
 
   setupSensors();
+
+  // initialize distance buffers to 1 element (will be dynamically resized when needed)
+  bufferSize = 0;
+  leftDistanceBuffer = (uint16_t*) malloc(sizeof(uint16_t) * bufferSize);
+  rightDistanceBuffer = (uint16_t*) malloc(sizeof(uint16_t) * bufferSize);
 
   startLeftSensor();
   startRightSensor();
@@ -336,7 +391,29 @@ void setup() {
 }
 
 void loop() {
-  bool positionUpdate = calculateBallCenter();
+  // This section keeps a buffer of continous positions and only shows the average
+  bool positionUpdate = readSensorData();
+  if (positionUpdate){
+    _lastMeasurementTime = millis();
+  }
+  else{
+    if(bufferSize > 0){
+      if(millis() - _lastMeasurementTime > positionResetTime){
+        lastCalculatedCenter = -1; // reset position to avoid showing stale data
+        resetBuffers();
+        bufferCalculated = false; // reset flag to allow calculating position with new data
+        Serial.println("Position buffers reset.");
+      }
+      else if(millis() - _lastMeasurementTime > updateTimeMillis && !bufferCalculated){
+        // calculate ball center with all the distances in the buffer to get a more stable position
+        digitalWrite(INT_LED_PIN, HIGH);
+        calculateBallCenter();
+        bufferCalculated = true; // avoid recalculating position until new data is read
+        delay(100);
+        digitalWrite(INT_LED_PIN, LOW);
+      }
+    }
+  }
   
   if (isMenuChanged()) {
     Serial.println("Updating menu...");
@@ -353,9 +430,33 @@ void loop() {
     delay(100);
     digitalWrite(INT_LED_PIN, LOW);
   }
+
+  // [DEBUG] print buffer and calculated position
+  /*
+  Serial.print("Left buffer:");
+  for (uint8_t i = 0; i < bufferSize; i++)
+    Serial.printf("%d ", leftDistanceBuffer[i]);
+
+  Serial.print("\nRight buffer:");
+  for (uint8_t i = 0; i < bufferSize; i++)
+    Serial.printf("%d ", rightDistanceBuffer[i]);
+
+  Serial.print("\nLeft last valid distance: ");
+  Serial.println(distanceToListel(leftLastValidDistance));
+
+  Serial.print("Right last valid distance: ");
+  Serial.println(distanceToListel(rightLastValidDistance));
+
+  Serial.print("Calculated position: ");
+  Serial.println(lastCalculatedCenter);
+  */
+
+  // debugIndicator(distanceToListel(leftLastValidDistance), strip.Color(255, 255, 0));
+  // debugIndicator(distanceToListel(rightLastValidDistance), strip.Color(255, 0, 255));
   
   // LED strip logic
-  updateLEDStrip(positionUpdate ? distanceToListel(lastValidDistance) : -1); // if position was updated send position
+  updateLEDStrip(distanceToListel(lastCalculatedCenter)); // if position was updated send position
+  //Serial.printf("Update: %d\tDistance: %d\n", positionUpdate, lastCalculatedCenter);
   stripShow();
 
   delay(10);
