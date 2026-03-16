@@ -16,7 +16,6 @@ enum SetupState : uint8_t {
   SETUP_ERROR
 };
 
-// Refer to README on how this structure can be visualized
 struct ItemValue {
     volatile void* valuePtr;
     DataType type;
@@ -25,6 +24,7 @@ struct ItemValue {
     float step;
 };
 
+// Refer to README on how this structure can be visualized
 struct MenuItem {
     const char* label;          // Menu voice name
     MenuItem* parent;           // Pointer to parent (above level menu)

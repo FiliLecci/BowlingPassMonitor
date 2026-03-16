@@ -1,5 +1,19 @@
 # BowlingPassMonitor
-An Arduino project that uses 2 VL53L1X sensors and an array of 39 addressable LEDs to detect and show a bowling ball passing point. The program features a menu with 3 modes (free, single target, and range) selectable via a CL11 encoder and a stand-alone button to get back to the main menu.
+An ESP32 project that uses 2 VL53L1X sensors and an array of 39 addressable LEDs to detect and show a bowling ball passing point. The program features a menu with 3 modes (free, single target, and range) selectable via an encoder and two buttons to navigate the menu.
+
+# How to use
+
+## Before flashing firmware
+
+Check the `config.h` file and change all the values to your needs. Pay attention to pin numbers as they may vary based on your board; check the [Electrical Scheme](#electrical-scheme) for details.
+
+Once you are sure the pin numbering is correct you can proceed with flashing the firmware on your ESP32.
+
+## Flashing
+
+The project uses PlatformIO as development platform. Opening the project with PlatformIO allows direct upload to an ESP32-S3 chip.
+
+# Technical info
 
 ## Menu
 The project features a complete and flexible menu with the possibility to navigate through submenus, change values, and perform any other action.
@@ -48,7 +62,14 @@ Each item on the menu consists of the following elements:
 ## Electrical scheme
 The proposed electrical scheme refers to a complete and all-in-one PCB including the ESP32-S3-MINI-1 IC, step-down regulators from 12V to 5V and from 5V to 3.3V, a USB-C connection, and RES and BOOT buttons. If interested in just the IO parts wiring, check the "IO components" section of the schema.
 
+![Electrical scheme](imgs/scheda_esp_WROOM.svg)
+
 ### Notes 
+
+- Pay attention to pull-up or pull-down resistors as they may vary depending on your configuration. For most ESP32 chips, internal pull-up resistors are available; using external resistor is suggested.
+
+- If using external pull-up or pull-down resistors there is no need to specify the pin modes as `INPUT_PULLUP` or `INPU_PULLDOWN`; change them to `INPUT` accordingly.\
+Althoug in the schema 10k resistors are placed for Menu and Select buttons, the code specify the corresponding pins mode as `INPUT_PULLUP`; this is because I added them in schema after making the PCB and thus my board doesn't have external pull-up's.
 
 - The D1 diode is used to isolate the LED's power line from the other parts. It stops the LED strip from receiving power from USB-C, which could draw up to 2.6A and damage the port.
 
@@ -58,4 +79,4 @@ The proposed electrical scheme refers to a complete and all-in-one PCB including
 
 - Listel numbering starts from the left;
 
-- Bowling ball size is estimated at 217 mm; this dimension is given by averaging the maximum and minimum allowed ball size.
+- Bowling ball size is estimated at 217 mm; this dimension is given by averaging the maximum and minimum allowed ball size (can be changed in `config.h`).

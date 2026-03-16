@@ -12,7 +12,7 @@
 
 // LED STRIP DIN PIN
 #define STRIP_PIN 11        // the pin to which the strip is connected
-#define NUM_LED 39           // total number of LEDs
+#define NUM_LED 39          // total number of LEDs
 #define LED_SPACING 25.4    // mm (default is 1in = 25.4mm)
 
 // INTEGRATED LED PIN
