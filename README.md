@@ -11,7 +11,15 @@ Once you are sure the pin numbering is correct you can proceed with flashing the
 
 ## Flashing
 
-The project uses PlatformIO as development platform. Opening the project with PlatformIO allows direct upload to an ESP32-S3 chip.
+### With PlatformIO (easy - recommended)
+The project uses PlatformIO as development platform. Opening the project with PlatformIO allows for direct upload to an ESP32-S3 chip without worrying too much.
+
+If you are using and ESP32-S3 N16R8V add [this](https://github.com/platformio/platform-espressif32/pull/921/changes) file to platformio boards as `esp32-s3-devkitc-1-n16r8v`. Otherwise select your preferred chip.
+> Note that this project uses a ESP32-S3-WROOM-1; different IC may require additional tuning and/or changes in the code if some features are not supported (i.e. dual I2C line).
+
+### esp-tool
+
+TODO because I don't use it.
 
 # Technical info
 
@@ -60,7 +68,7 @@ Each item on the menu consists of the following elements:
 > An item with no action simply won't do anything.
 
 ## Electrical scheme
-The proposed electrical scheme refers to a complete and all-in-one PCB including the ESP32-S3-MINI-1 IC, step-down regulators from 12V to 5V and from 5V to 3.3V, a USB-C connection, and RES and BOOT buttons. If interested in just the IO parts wiring, check the "IO components" section of the schema.
+The proposed electrical scheme refers to a complete all-in-one PCB including an ESP32-S3-WROOM-1 MC, step-down regulators from 12V to 5V and from 5V to 3.3V, a USB-C connection, and RES and BOOT buttons. If interested in just the IO parts wiring, check the "IO components" section of the schema.
 
 ![Electrical scheme](imgs/scheda_esp_WROOM.svg)
 
