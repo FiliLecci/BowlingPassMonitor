@@ -37,16 +37,18 @@ static void IRAM_ATTR toggleValueEditingAction(){
   menuChanged = true;
 }
 
-// MENU ITEMS
+// MENU ITEMS - siblings are assigned in the initMenu function
 bool menuChanged = false;
+// ROOT
 static MenuItem root              = {"ROOT", NULL, NULL, NULL, NULL, NULL, selectSubMenuAction};
-
+// modes
 static MenuItem freeMode          = {"Modalità libera", &root, NULL, NULL, NULL, NULL, NULL};
 static MenuItem singleTargetMode  = {"Target", &root, NULL, NULL, NULL, NULL, selectSubMenuAction};
 static MenuItem rangeMode         = {"Range", &root, NULL, NULL, NULL, NULL, selectSubMenuAction};
-
+static MenuItem sensorsDebugMode  = {"Debug sensori", &root, NULL, NULL, NULL, NULL, selectSubMenuAction};
+// single target item
 static MenuItem target            = {"Target", &singleTargetMode, NULL, NULL, NULL, &singleTargetValue, toggleValueEditingAction};
-
+// range items
 static MenuItem leftTarget        = {"Target SX", &rangeMode, NULL, NULL, NULL, &rangeLeftValue, toggleValueEditingAction};
 static MenuItem rightTarget       = {"Target DX", &rangeMode, NULL, NULL, NULL, &rangeRightValue, toggleValueEditingAction};
 
@@ -434,15 +436,15 @@ void drawSetupStatus() {
   display.setTextColor(SSD1306_WHITE);
 
   display.setCursor(0, 0);
-  display.print("[SX] Sensor  ");
+  display.print("SX Sensor ");
   display.println(stateIcon(sensorLeftState));
 
   display.setCursor(0, 10);
-  display.print("[DX] Sensor  ");
+  display.print("DX Sensor ");
   display.println(stateIcon(sensorRightState));
 
   display.setCursor(0, 20);
-  display.print("[LED] Strip  ");
+  display.print("LED strip ");
   display.println(stateIcon(ledStripState));
 
   display.display();
