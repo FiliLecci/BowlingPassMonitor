@@ -23,15 +23,15 @@ bool _selBtnPressed = false;
 bool _menuBtnPressed = false;
 
 // sensors distances
-int16_t leftLastValidDistance = 0;
-int16_t rightLastValidDistance = 0;
-int16_t lastCalculatedCenter = 0;
+uint16_t leftLastValidDistance = 0;
+uint16_t rightLastValidDistance = 0;
+uint16_t lastCalculatedCenter = 0;
 uint16_t *leftDistanceBuffer; // buffer with left distances used to calculate the average position
 uint16_t *rightDistanceBuffer; // buffer with right distances used to calculate the average position
 uint8_t bufferSize = 0;
 // used to buffer data
 unsigned long _lastMeasurementTime = 0; // last valid measurement time for both sensors
-unsigned long updateTimeMillis = 500;   // time with no new data after which the position is calculated
+unsigned long updateTimeMillis = 300;   // time with no new data after which the position is calculated
 unsigned long positionResetTime = 10000; // time with no new data after which the position is reset to avoid showing stale data
 bool bufferCalculated = false; // flag to know if the position has been calculated with the buffer data
 
@@ -378,6 +378,8 @@ void setup() {
   setupLedStrip();
   setLEDSingleTargetBinder(getSingleTargetPtr());
   setLEDRangeBinder(getRangePtr());
+  setLeftDistancePtr(&leftLastValidDistance);
+  setRightDistancePtr(&rightLastValidDistance);
   setLedStripStatus(SETUP_OK);
   drawSetupStatus();
 

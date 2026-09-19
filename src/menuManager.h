@@ -78,5 +78,7 @@ uint8_t getMode();
 
 void setLeftSensorStatus(uint8_t state);
 void setRightSensorStatus(uint8_t state);
+void setLeftDistancePtr(uint16_t* distancePtr);
+void setRightDistancePtr(uint16_t* distancePtr);
 void setLedStripStatus(uint8_t state);
 void drawSetupStatus();

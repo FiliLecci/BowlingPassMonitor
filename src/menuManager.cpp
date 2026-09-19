@@ -16,6 +16,8 @@ static volatile int8_t valueUpdate = 0; // By how much the selected value should
 
 static volatile uint8_t singleTarget = 1;          // Single target selected listel
 static volatile uint8_t range[2] = {1,2};          // Range left and right selected listels
+static uint16_t* sensorLeftDistance = 0;                    // Left sensor measurement
+static uint16_t* sensorRightDistance = 0;                   // Right sensor measurement
 
 static volatile bool isValueEditingEnabled = false;   // Allow to modify selected value (if possible)
 static MenuItem* volatile selectedItem = NULL;        // Current menu position
@@ -23,7 +25,9 @@ static MenuItem* volatile selectedItem = NULL;        // Current menu position
 // ITEMS VALUES
 static ItemValue singleTargetValue  = {&singleTarget, UINT8, 1, NUM_LISTELS, 1};
 static ItemValue rangeLeftValue     = {&range[0], UINT8, 1, NUM_LISTELS, 1};
-static ItemValue rangeRightValue     = {&range[1], UINT8, 1, NUM_LISTELS, 1};
+static ItemValue rangeRightValue    = {&range[1], UINT8, 1, NUM_LISTELS, 1};
+static ItemValue sensorLeftMeasure  = {sensorLeftDistance, UINT16, 1, NUM_LISTELS, 0};
+static ItemValue sensorRightMeasure = {sensorRightDistance, UINT16, 1, NUM_LISTELS, 0};
 
 // ITEMS ACTIONS
 static void IRAM_ATTR selectSubMenuAction(){
@@ -51,7 +55,9 @@ static MenuItem target            = {"Target", &singleTargetMode, NULL, NULL, NU
 // range items
 static MenuItem leftTarget        = {"Target SX", &rangeMode, NULL, NULL, NULL, &rangeLeftValue, toggleValueEditingAction};
 static MenuItem rightTarget       = {"Target DX", &rangeMode, NULL, NULL, NULL, &rangeRightValue, toggleValueEditingAction};
-
+// debug items
+static MenuItem leftMeasure       = {"SX", &sensorsDebugMode, NULL, NULL, NULL, &sensorLeftMeasure, NULL};
+static MenuItem rightMeasure       = {"SX", &sensorsDebugMode, NULL, NULL, NULL, &sensorRightMeasure, NULL};
 
 void setupScreen(){
   Serial.println("Starting display...");
@@ -92,6 +98,11 @@ void initMenu(){
   // Range menu
   leftTarget.nextSibling = &rightTarget;
   rightTarget.prevSibling = &leftTarget;
+
+  // Debug menu
+  sensorsDebugMode.firstChild = &leftMeasure;
+  leftMeasure.nextSibling = &rightMeasure;
+  rightMeasure.prevSibling = &leftMeasure;
 
   // Init starting position at first item below Root
   selectedItem = root.firstChild == NULL ? &root : root.firstChild;
@@ -386,6 +397,15 @@ volatile uint8_t* getSingleTargetPtr(){
 
 volatile uint8_t* getRangePtr() {
   return range;
+}
+
+// Functions to set the distance pointers to the values used in the main
+void setLeftDistancePtr(uint16_t* distancePtr) {
+  sensorLeftDistance = distancePtr;
+}
+
+void setRightDistancePtr(uint16_t* distancePtr) {
+  sensorRightDistance = distancePtr;
 }
 
 uint8_t getMode(){
