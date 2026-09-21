@@ -1,5 +1,11 @@
 #include "./config.h"
 
+#ifndef MENU_H
+#define MENU_H
+
+extern uint16_t leftLastValidDistance;
+extern uint16_t rightLastValidDistance;
+
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 32 // OLED display height, in pixels
 
@@ -82,3 +88,5 @@ void setLeftDistancePtr(uint16_t* distancePtr);
 void setRightDistancePtr(uint16_t* distancePtr);
 void setLedStripStatus(uint8_t state);
 void drawSetupStatus();
+
+#endif

@@ -14,10 +14,8 @@ static SetupState ledStripState    = SETUP_PENDING;
 
 static volatile int8_t valueUpdate = 0; // By how much the selected value should be updated at the next menù update 
 
-static volatile uint8_t singleTarget = 1;          // Single target selected listel
-static volatile uint8_t range[2] = {1,2};          // Range left and right selected listels
-static uint16_t* sensorLeftDistance = 0;                    // Left sensor measurement
-static uint16_t* sensorRightDistance = 0;                   // Right sensor measurement
+static volatile uint8_t singleTarget = 1;           // Single target selected listel
+static volatile uint8_t range[2] = {1,2};           // Range left and right selected listels
 
 static volatile bool isValueEditingEnabled = false;   // Allow to modify selected value (if possible)
 static MenuItem* volatile selectedItem = NULL;        // Current menu position
@@ -26,8 +24,8 @@ static MenuItem* volatile selectedItem = NULL;        // Current menu position
 static ItemValue singleTargetValue  = {&singleTarget, UINT8, 1, NUM_LISTELS, 1};
 static ItemValue rangeLeftValue     = {&range[0], UINT8, 1, NUM_LISTELS, 1};
 static ItemValue rangeRightValue    = {&range[1], UINT8, 1, NUM_LISTELS, 1};
-static ItemValue sensorLeftMeasure  = {sensorLeftDistance, UINT16, 1, NUM_LISTELS, 0};
-static ItemValue sensorRightMeasure = {sensorRightDistance, UINT16, 1, NUM_LISTELS, 0};
+static ItemValue sensorLeftMeasure  = {&leftLastValidDistance, UINT16, 1, NUM_LISTELS, 0};
+static ItemValue sensorRightMeasure = {&rightLastValidDistance, UINT16, 1, NUM_LISTELS, 0};
 
 // ITEMS ACTIONS
 static void IRAM_ATTR selectSubMenuAction(){
@@ -57,7 +55,7 @@ static MenuItem leftTarget        = {"Target SX", &rangeMode, NULL, NULL, NULL, 
 static MenuItem rightTarget       = {"Target DX", &rangeMode, NULL, NULL, NULL, &rangeRightValue, toggleValueEditingAction};
 // debug items
 static MenuItem leftMeasure       = {"SX", &sensorsDebugMode, NULL, NULL, NULL, &sensorLeftMeasure, NULL};
-static MenuItem rightMeasure       = {"SX", &sensorsDebugMode, NULL, NULL, NULL, &sensorRightMeasure, NULL};
+static MenuItem rightMeasure       = {"DX", &sensorsDebugMode, NULL, NULL, NULL, &sensorRightMeasure, NULL};
 
 void setupScreen(){
   Serial.println("Starting display...");
@@ -81,9 +79,11 @@ void setupScreen(){
 }
 
 void initMenu(){
-  // Main menu
+  // TODO make this a bit more clear because sometimes it's hard to understand
+  // Root
   root.firstChild = &freeMode;
   
+  // Root menu
   freeMode.nextSibling = &singleTargetMode;
 
   singleTargetMode.nextSibling = &rangeMode;
@@ -92,7 +92,10 @@ void initMenu(){
 
   rangeMode.firstChild = &leftTarget;
   rangeMode.prevSibling = &singleTargetMode;
+  rangeMode.nextSibling = &sensorsDebugMode;
 
+  sensorsDebugMode.prevSibling = &rangeMode;
+  sensorsDebugMode.firstChild = &leftMeasure;
   // No setup needed for single target menu since there are no sub-menus nor siblings
 
   // Range menu
@@ -100,7 +103,6 @@ void initMenu(){
   rightTarget.prevSibling = &leftTarget;
 
   // Debug menu
-  sensorsDebugMode.firstChild = &leftMeasure;
   leftMeasure.nextSibling = &rightMeasure;
   rightMeasure.prevSibling = &leftMeasure;
 
@@ -323,7 +325,6 @@ void displayAndClear(){
   display.display();
   display.clearDisplay();
   display.setCursor(1,1);
-  menuChanged = false;
 }
 
 // Print the menu on the screen buffer
@@ -377,11 +378,16 @@ void updateMenuSafe() {
     }
     portEXIT_CRITICAL(&myMux);
     // ---
+
+    // If in debug mode, update screen anyway
+    if(selectedItem->parent == &sensorsDebugMode){
+        menuChanged = true;
+    }
     
     if(shouldProceed){
       // Now it's safe to call logic things by passing copyed values
       // Now the watchdog shoud be happy
-      topDisplayedItem = updateScrolling(snapshotSelected); // This can be done here because pinter assign in an ESP32 is atomic
+      topDisplayedItem = updateScrolling(snapshotSelected); // This can be done here because pointer assign in an ESP32 is atomic
 
       updateMenuUnsafe(snapshotSelected, snapshotUpdateValue);
     }
@@ -399,14 +405,6 @@ volatile uint8_t* getRangePtr() {
   return range;
 }
 
-// Functions to set the distance pointers to the values used in the main
-void setLeftDistancePtr(uint16_t* distancePtr) {
-  sensorLeftDistance = distancePtr;
-}
-
-void setRightDistancePtr(uint16_t* distancePtr) {
-  sensorRightDistance = distancePtr;
-}
 
 uint8_t getMode(){
   uint8_t mode = 0;

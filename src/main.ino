@@ -9,6 +9,8 @@
 VL53L1X sensor_left;
 VL53L1X sensor_right;
 
+bool sensorSetupError = false;
+
 // Mutex for menu manager to be used
 portMUX_TYPE myMux = portMUX_INITIALIZER_UNLOCKED;
 
@@ -60,6 +62,7 @@ void scanI2C2() {
 }
 
 void setupSensors() {
+  sensorSetupError = false;
   pinMode(XSHUT_PIN_L, OUTPUT);
   pinMode(XSHUT_PIN_R, OUTPUT);
 
@@ -85,21 +88,20 @@ void setupSensors() {
   // setup left sensor
   Serial.println("Left sensor init...");
 
+  setLeftSensorStatus(SETUP_OK);
   sensor_left.setBus(&Wire);
   if (!sensor_left.init()) {
     setLeftSensorStatus(SETUP_ERROR);
     drawSetupStatus();
 
     Serial.print(F("Error on init of left VL sensor."));
-    while (1)
-      delay(100);
+    sensorSetupError = true;
   }
   sensor_left.setAddress(0x30);
 
   Serial.print(F("Sensor left ID: 0x"));
   Serial.println(sensor_left.getAddress(), HEX);
 
-  setLeftSensorStatus(SETUP_OK);
   drawSetupStatus();
 
   // setup right sensor
@@ -110,13 +112,14 @@ void setupSensors() {
   Serial.println("Right sensor init...");
 
   sensor_right.setBus(&Wire);
+
+  setRightSensorStatus(SETUP_OK);
   if (!sensor_right.init()) {
     setRightSensorStatus(SETUP_ERROR);
     drawSetupStatus();
 
     Serial.print(F("Error on init of right VL sensor."));
-    while (1)
-      delay(100);
+    sensorSetupError = true;
   }
   sensor_right.setAddress(0x31);
 
@@ -124,12 +127,9 @@ void setupSensors() {
   Serial.print(F("Sensor right ID: 0x"));
   Serial.println(sensor_right.getAddress(), HEX);
 
-  setRightSensorStatus(SETUP_OK);
   drawSetupStatus();
 
   Wire.setClock(400000);
-
-  Serial.println(F("VL53L1X sensors OK!"));
 }
 
 // code from https://github.com/mo-thunderz/RotaryEncoder/blob/main/Arduino/ArduinoRotaryEncoder/ArduinoRotaryEncoder.ino
@@ -365,58 +365,64 @@ void setup() {
 
   setupSensors();
 
+  if (!sensorSetupError){
   // initialize distance buffers to 1 element (will be dynamically resized when needed)
   bufferSize = 0;
-  leftDistanceBuffer = (uint16_t*) malloc(sizeof(uint16_t) * bufferSize);
-  rightDistanceBuffer = (uint16_t*) malloc(sizeof(uint16_t) * bufferSize);
+    leftDistanceBuffer = (uint16_t*) malloc(sizeof(uint16_t) * bufferSize);
+    rightDistanceBuffer = (uint16_t*) malloc(sizeof(uint16_t) * bufferSize);
 
-  startLeftSensor();
-  startRightSensor();
-  
+    startLeftSensor();
+    startRightSensor();
+  }
+
   setupInputs();
 
   setupLedStrip();
   setLEDSingleTargetBinder(getSingleTargetPtr());
   setLEDRangeBinder(getRangePtr());
-  setLeftDistancePtr(&leftLastValidDistance);
-  setRightDistancePtr(&rightLastValidDistance);
   setLedStripStatus(SETUP_OK);
   drawSetupStatus();
 
-  delay(1000);
+  // Time after wich the menu is shown after the setup screen
+  delay(4000);
 
   displayAndClear();
   initMenu();
 
+  // Do it even if there are sensor errors to detect any other connected devices
   scanI2C1();
   scanI2C2();
 }
 
 void loop() {
-  // This section keeps a buffer of continous positions and only shows the average
-  bool positionUpdate = readSensorData();
-  if (positionUpdate){
-    _lastMeasurementTime = millis();
-  }
-  else{
-    if(bufferSize > 0){
-      if(millis() - _lastMeasurementTime > positionResetTime){
-        lastCalculatedCenter = -1; // reset position to avoid showing stale data
-        resetBuffers();
-        bufferCalculated = false; // reset flag to allow calculating position with new data
-        Serial.println("Position buffers reset.");
-      }
-      else if(millis() - _lastMeasurementTime > updateTimeMillis && !bufferCalculated){
-        // calculate ball center with all the distances in the buffer to get a more stable position
-        digitalWrite(INT_LED_PIN, HIGH);
-        calculateBallCenter();
-        bufferCalculated = true; // avoid recalculating position until new data is read
-        delay(100);
-        digitalWrite(INT_LED_PIN, LOW);
+  if(!sensorSetupError){
+    // This section keeps a buffer of continous positions and only shows the average
+    bool positionUpdate = readSensorData();
+    if (positionUpdate){
+      _lastMeasurementTime = millis();
+    }
+    else{
+      if(bufferSize > 0){
+        if(millis() - _lastMeasurementTime > positionResetTime){
+          lastCalculatedCenter = -1; // reset position to avoid showing stale data
+          resetBuffers();
+          bufferCalculated = false; // reset flag to allow calculating position with new data
+          Serial.println("Position buffers reset.");
+        }
+        else if(millis() - _lastMeasurementTime > updateTimeMillis && !bufferCalculated){
+          // calculate ball center with all the distances in the buffer to get a more stable position
+          digitalWrite(INT_LED_PIN, HIGH);
+          calculateBallCenter();
+          bufferCalculated = true; // avoid recalculating position until new data is read
+          delay(100);
+          digitalWrite(INT_LED_PIN, LOW);
+        }
       }
     }
   }
   
+  // Print menu if there have been changes
+  // TODO use a single function (i.e. updateMenu()) that does this for itself (check if changed, update, display and clear)
   if (isMenuChanged()) {
     Serial.println("Updating menu...");
     
@@ -433,29 +439,6 @@ void loop() {
     digitalWrite(INT_LED_PIN, LOW);
   }
 
-  // [DEBUG] print buffer and calculated position
-  /*
-  Serial.print("Left buffer:");
-  for (uint8_t i = 0; i < bufferSize; i++)
-    Serial.printf("%d ", leftDistanceBuffer[i]);
-
-  Serial.print("\nRight buffer:");
-  for (uint8_t i = 0; i < bufferSize; i++)
-    Serial.printf("%d ", rightDistanceBuffer[i]);
-
-  Serial.print("\nLeft last valid distance: ");
-  Serial.println(distanceToListel(leftLastValidDistance));
-
-  Serial.print("Right last valid distance: ");
-  Serial.println(distanceToListel(rightLastValidDistance));
-
-  Serial.print("Calculated position: ");
-  Serial.println(lastCalculatedCenter);
-  */
-
-  // debugIndicator(distanceToListel(leftLastValidDistance), strip.Color(255, 255, 0));
-  // debugIndicator(distanceToListel(rightLastValidDistance), strip.Color(255, 0, 255));
-  
   // LED strip logic
   updateLEDStrip(distanceToListel(lastCalculatedCenter)); // if position was updated send position
   //Serial.printf("Update: %d\tDistance: %d\n", positionUpdate, lastCalculatedCenter);
